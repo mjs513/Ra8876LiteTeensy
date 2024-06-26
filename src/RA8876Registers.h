@@ -1,17 +1,21 @@
 //**************************************************************//
+// Teensy 4.1 8080 Parallel 8/16 bit with 8 bit ASYNC support.
+//**************************************************************//
 /*
-File Name : Ra8876_Lite.h                                   
-Author    : RAiO Application Team                             
-Edit Date : 12/29/2015
-Version   : v1.0
-*
-* Modified Version of: File Name : Ra8876_Lite.h                                   
+ * Ra8876LiteTeensy.cpp
+ * Modified Version of: File Name : RA8876_t3.cpp                                   
  *			Author    : RAiO Application Team                             
  *			Edit Date : 09/13/2017
- * 	  	     : For Teensy 3.x and T4
- *                   : By Warren Watson
- *                   : 06/07/2018 - 11/31/2019
- *                   : Copyright (c) 2017-2019 Warren Watson.
+ *			Version   : v2.0  1.modify bte_DestinationMemoryStartAddr bug 
+ *                 			  2.modify ra8876SdramInitial Auto_Refresh
+ *                 			  3.modify ra8876PllInitial 
+ ****************************************************************
+ * 	  	              : New 8080 Parallel version
+ *                    : For MicroMod
+ *                    : By Warren Watson
+ *                    : 06/07/2018 - 05/03/2024
+ *                    : Copyright (c) 2017-2024 Warren Watson.
+ *****************************************************************
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -846,30 +850,6 @@ memory size. For example : page_size = 1024*600*2byte(16bpp) = 1228800byte, maxi
 #define	cClrb6		0xbf
 #define	cClrb7		0x7f
 
-// Lets see about supporting Adafruit fonts as well?
-#ifndef _GFXFONT_H_
-#define _GFXFONT_H_
-/// Font data stored PER GLYPH
-typedef struct {
-	uint16_t bitmapOffset;     ///< Pointer into GFXfont->bitmap
-	uint8_t  width;            ///< Bitmap dimensions in pixels
-    uint8_t  height;           ///< Bitmap dimensions in pixels
-	uint8_t  xAdvance;         ///< Distance to advance cursor (x axis)
-	int8_t   xOffset;          ///< X dist from cursor pos to UL corner
-    int8_t   yOffset;          ///< Y dist from cursor pos to UL corner
-} GFXglyph;
-
-/// Data stored for FONT AS A WHOLE
-typedef struct { 
-	uint8_t  *bitmap;      ///< Glyph bitmaps, concatenated
-	GFXglyph *glyph;       ///< Glyph array
-	uint8_t   first;       ///< ASCII extents (first char)
-    uint8_t   last;        ///< ASCII extents (last char)
-	uint8_t   yAdvance;    ///< Newline distance (y axis)
-} GFXfont;
-
-#endif // _GFXFONT_H_ 
-
 // Define USE_FF_FONTLOAD to 1 if using FatFS to load user defined fonts
 // from a disk drive. Needs FatFS, SDFat or SD. fontLoad() is currently
 // setup to use FatFS.
@@ -995,8 +975,7 @@ Not all users need this so you can select if include Render Text Optimizations o
 //#define RA8875_VISPIXDEBUG 								// [default commented]
 #define FORCE_RA8875_TXTREND_FOLLOW_CURS 					// [default uncommented]
 
-	//#define CENTER 				9998
-	static const int16_t CENTER = 9998;
+	#define CENTER 				9998
 	#define ARC_ANGLE_MAX 		360		
 	#define ARC_ANGLE_OFFSET 	-90	
 	#define ANGLE_OFFSET		-90

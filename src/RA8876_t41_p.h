@@ -1,17 +1,21 @@
 //**************************************************************//
+// Teensy 4.1 8080 Parallel 8/16 bit with 8 bit ASYNC support.
+//**************************************************************//
 /*
-File Name : Ra8876_Lite.h                                   
-Author    : RAiO Application Team                             
-Edit Date : 12/29/2015
-Version   : v1.0
-*
-* Modified Version of: File Name : Ra8876_Lite.h                                   
+ * Ra8876LiteTeensy.cpp
+ * Modified Version of: File Name : RA8876_t41_p.cpp                                   
  *			Author    : RAiO Application Team                             
  *			Edit Date : 09/13/2017
- * 	  	     : For Teensy 3.x and T4
- *                   : By Warren Watson
- *                   : 06/07/2018 - 11/31/2019
- *                   : Copyright (c) 2017-2019 Warren Watson.
+ *			Version   : v2.0  1.modify bte_DestinationMemoryStartAddr bug 
+ *                 			  2.modify ra8876SdramInitial Auto_Refresh
+ *                 			  3.modify ra8876PllInitial 
+ ****************************************************************
+ * 	  	              : New 8080 Parallel version
+ *                    : For MicroMod
+ *                    : By Warren Watson
+ *                    : 06/07/2018 - 05/03/2024
+ *                    : Copyright (c) 2017-2024 Warren Watson.
+ *****************************************************************
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -69,16 +73,30 @@ Version   : v1.0
  ***************************************************************/
 
 #include "Arduino.h"
-#include "SPI.h"
 #include "RA8876Registers.h"
 
-#ifndef _RA8876_T3
-#define _RA8876_T3
+#ifndef _RA8876_T41_P
+#define _RA8876_T41_P
 
-#define USE_FT5206_TOUCH
+//#define WINT 33       // RA8876 xnWAIT pin (Dev Board)
+//#define USE_FT5206_TOUCH
+
+#include "FlexIO_t4.h"
+
+#define WR_PIN 36
+#define RD_PIN 37
+
+#define BUS_WIDTH 8  /*Available options are 8 or 16 */
+#define SHIFTNUM 8 // number of shifters used (up to 8)
+#define BYTES_PER_BEAT (sizeof(uint8_t))
+#define BEATS_PER_SHIFTER (sizeof(uint32_t)/BYTES_PER_BEAT)
+#define BYTES_PER_BURST (sizeof(uint32_t)*SHIFTNUM)
+#define SHIFTER_IRQ (SHIFTNUM-1)
+#define TIMER_IRQ 0
+#define FLEXIO_ISR_PRIORITY 64 // interrupt is timing sensitive, so use relatively high priority (supersedes USB)
 
 /* Addins for ILI and GFX Fonts */
-#include "_fonts.h"
+#include "ILI9341_fonts.h"
 
 #if !defined(swapvals)
 	#if defined(ESP8266)
@@ -100,29 +118,24 @@ Version   : v1.0
 
 /// Font data stored PER GLYPH
 typedef struct {
-	uint16_t bitmapOffset;     ///< Pointer into GFXfont->bitmap
-	uint8_t  width;            ///< Bitmap dimensions in pixels
-    uint8_t  height;           ///< Bitmap dimensions in pixels
-	uint8_t  xAdvance;         ///< Distance to advance cursor (x axis)
-	int8_t   xOffset;          ///< X dist from cursor pos to UL corner
-    int8_t   yOffset;          ///< Y dist from cursor pos to UL corner
+  uint16_t bitmapOffset; ///< Pointer into GFXfont->bitmap
+  uint8_t width;         ///< Bitmap dimensions in pixels
+  uint8_t height;        ///< Bitmap dimensions in pixels
+  uint8_t xAdvance;      ///< Distance to advance cursor (x axis)
+  int8_t xOffset;        ///< X dist from cursor pos to UL corner
+  int8_t yOffset;        ///< Y dist from cursor pos to UL corner
 } GFXglyph;
 
 /// Data stored for FONT AS A WHOLE
-typedef struct { 
-	uint8_t  *bitmap;      ///< Glyph bitmaps, concatenated
-	GFXglyph *glyph;       ///< Glyph array
-	uint8_t   first;       ///< ASCII extents (first char)
-    uint8_t   last;        ///< ASCII extents (last char)
-	uint8_t   yAdvance;    ///< Newline distance (y axis)
+typedef struct {
+  uint8_t *bitmap;  ///< Glyph bitmaps, concatenated
+  GFXglyph *glyph;  ///< Glyph array
+  uint16_t first;   ///< ASCII extents (first char)
+  uint16_t last;    ///< ASCII extents (last char)
+  uint8_t yAdvance; ///< Newline distance (y axis)
 } GFXfont;
 
 #endif // _GFXFONT_H_ 
-
-
-// Default to a relatively slow speed for breadboard testing. 
-//const ru32 SPIspeed = 47000000;
-const ru32 SPIspeed = 3000000;
 
 // Max. size in byte of SDRAM
 const uint32_t MEM_SIZE_MAX	= 16l*1024l*1024l;
@@ -132,19 +145,20 @@ const uint32_t MEM_SIZE_MAX	= 16l*1024l*1024l;
 #endif
 
 
-class RA8876_t3 : public Print
+class RA8876_t41_p : public Print
 {
 public:
-	RA8876_t3(const uint8_t CSp = 10, const uint8_t RSTp = 8, const uint8_t mosi_pin = 11, const uint8_t sclk_pin = 13, const uint8_t miso_pin = 12);
+	RA8876_t41_p(const uint8_t DCp = 13, const uint8_t CSp = 11, const uint8_t RSTp = 12);
 
-	
-	volatile bool	RA8876_BUSY; //This is used to show an SPI transaction is in progress. 
-	volatile bool   activeDMA=false; //Unfortunately must be public so asyncEventResponder() can set it
+	volatile bool	RA8876_BUSY; //This is used to show an transaction is in progress. 
 	void textRotate(boolean on);
 	void		setRotation(uint8_t rotation); //rotate text and graphics
 	uint8_t		getRotation(); //return the current rotation 0-3
+
 	/* Initialize RA8876 */
-	boolean begin(uint32_t spi_clock=SPIspeed);
+	boolean begin(uint8_t baud_div);
+
+    void RA8876_SW_Reset(void);
 	boolean ra8876Initialize(); 
 	boolean ra8876PllInitial (void);
 	boolean ra8876SdramInitial(void);
@@ -157,12 +171,13 @@ public:
 	void lcdRegWrite(ru8 reg, bool finalize = true);
 	void lcdDataWrite(ru8 data, bool finalize = true);
 	ru8 lcdDataRead(bool finalize = true);
-	ru16 lcdDataRead16bpp(bool finalize = true);
 	ru8 lcdStatusRead(bool finalize = true);
 	void lcdRegDataWrite(ru8 reg,ru8 data, bool finalize = true);
 	ru8 lcdRegDataRead(ru8 reg, bool finalize = true);
 	void lcdDataWrite16bbp(ru16 data, bool finalize = true); 
 	
+    void lcdDataWrite16(uint16_t data, bool finalize = true);
+
 	/*Status*/
 	void checkWriteFifoNotFull(void);
 	void checkWriteFifoEmpty(void);
@@ -251,18 +266,6 @@ public:
 	uint32_t boxPut(uint32_t vPageAddr, uint16_t x0, uint16_t y0,uint16_t x1, uint16_t y1, uint16_t dx0, uint16_t dy0);
 	uint32_t boxGet(uint32_t vPageAddr, uint16_t x0, uint16_t y0,uint16_t x1, uint16_t y1, uint16_t dx0, uint16_t dy0);
 
-	
-	/* Button Functions */
-	void initButton(struct Gbuttons *button, uint16_t x, uint16_t y, uint8_t w, uint8_t h,
-		uint16_t outline, uint16_t fill, uint16_t textcolor,
-		char *label, uint8_t textsize);
-	void drawButton(struct Gbuttons *buttons, bool inverted);
-	bool buttonContains(struct Gbuttons *buttons,uint16_t x, uint16_t y);
-	void buttonPress(struct Gbuttons *buttons, bool p);
-	bool buttonIsPressed(struct Gbuttons *buttons);
-	bool buttonJustPressed(struct Gbuttons *buttons);
-	bool buttonJustReleased(struct Gbuttons *buttons);
-	
 	
 	/*  Font Functions  */
 	//**[DBh]~[DEh]**//
@@ -355,7 +358,6 @@ public:
 							ru16 des_x,ru16 des_y,ru16 width,ru16 height,ru8 rop_code,const unsigned char *data);
 	void bteMpuWriteWithROPData16(ru32 s1_addr,ru16 s1_image_width,ru16 s1_x,ru16 s1_y,ru32 des_addr,ru16 des_image_width,
 							ru16 des_x,ru16 des_y,ru16 width,ru16 height,ru8 rop_code,const unsigned short *data);
-	bool DMAFinished() {return !activeDMA;}
 	void bteMpuWriteWithROP(ru32 s1_addr,ru16 s1_image_width,ru16 s1_x,ru16 s1_y,ru32 des_addr,ru16 des_image_width,
 							ru16 des_x,ru16 des_y,ru16 width,ru16 height,ru8 rop_code);                     
 	void bteMpuWriteWithChromaKeyData8(ru32 des_addr,ru16 des_image_width, ru16 des_x,ru16 des_y,ru16 width,ru16 height,ru16 chromakey_color,
@@ -438,7 +440,6 @@ public:
 	void setPromptSize(uint16_t ps);
 	uint8_t fontLoad(char *fontfile);
 	uint8_t fontLoadMEM(char *fontsrc);
-	//void setFontSource(uint8_t source);
 	boolean setFontSize(uint8_t scale, boolean runflag=false);
 	//void setTextSize(uint8_t scale, boolean runflag=false) { setFontSize(scale, runflag);}
 	int16_t getTextY(void);
@@ -475,13 +476,6 @@ public:
 	uint16_t GetGCursorX() {return gCursorX;}
 	uint16_t GetGCursorY() {return gCursorY;}
 
-
-	void touchEnable(boolean enabled);
-	void readTouchADC(uint16_t *x, uint16_t *y);
-
-	
-	boolean TStouched(void);
-	void getTSpoint(uint16_t *x, uint16_t *y);
 	#if defined (USE_FT5206_TOUCH)
 	bool 		touched(bool safe=false);
 	void 		setTouchLimit(uint8_t limit);//5 for FT5206, 1 for  RA8875
@@ -613,36 +607,6 @@ public:
 	}
 	#endif
 
-	//SPI Functions - should these be private?
-	inline __attribute__((always_inline)) 
-	void startSend(){
-		#ifdef SPI_HAS_TRANSFER_ASYNC
-		while(activeDMA) {}; //wait forever while DMA is finishing- can't start a new transfer
-		#endif
-		if(!RA8876_BUSY) {
-	        RA8876_BUSY = true;
-			_pspi->beginTransaction(SPISettings(_SPI_CLOCK, MSBFIRST, SPI_MODE0));
-		}
-		#if defined(__IMXRT1052__) || defined(__IMXRT1062__)  // Teensy 4.x 
-		DIRECT_WRITE_LOW(_csport, _cspinmask);
-		#else
-			*_csport  &= ~_cspinmask;
-		#endif
-	}
-
-	inline __attribute__((always_inline)) 
-	void endSend(bool finalize){
-		#if defined(__IMXRT1052__) || defined(__IMXRT1062__)  // Teensy 4.x 
-		DIRECT_WRITE_HIGH(_csport, _cspinmask);
-		#else
-		*_csport |= _cspinmask;
-		#endif
-		if(finalize) {
-			_pspi->endTransaction();
-			RA8876_BUSY = false;
-		}
-	} 
-	
 	// overwrite print functions:
 	virtual size_t write(uint8_t);
 	virtual size_t write(const uint8_t *buffer, size_t size);
@@ -651,7 +615,50 @@ public:
 	
 	void LCD_CmdWrite(unsigned char cmd);
 
-	
+  typedef void(*CBF)();
+  CBF _callback;
+  void onCompleteCB(CBF callback);
+
+  void FlexIO_Clear_Config_SnglBeat();
+  void MulBeatWR_nPrm_IRQ(const void *value, uint32_t const length);
+  void pushPixels16bitAsync(const uint16_t * pcolors, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2);
+  void lcdRegDataWrite16(ru8 reg, ru16 data, bool finalize);
+
+  FlexIOHandler *pFlex;
+  IMXRT_FLEXIO_t *p;
+  const FlexIOHandler::FLEXIO_Hardware_t *hw;
+   
+    uint8_t _baud_div = 20; 
+    int8_t  _dc; //, _cs, _rst;
+
+    uint8_t _dummy;
+
+    uint32_t MulBeatCountRemain;
+    uint16_t *MulBeatDataRemain;
+    uint32_t TotalSize; 
+
+    /* variables used by ISR */
+    volatile uint32_t bytes_remaining;
+    volatile unsigned int bursts_to_complete;
+    volatile uint32_t *readPtr;
+    uint32_t finalBurstBuffer[SHIFTNUM];
+
+    void displayInit();
+    void CSLow();
+    void CSHigh();
+    void DCLow();
+    void DCHigh();
+    void FlexIO_Init();
+    void FlexIO_Config_SnglBeat();
+    void FlexIO_Config_MultiBeat();
+    void FlexIO_Config_SnglBeat_Read();
+    
+    void microSecondDelay();
+
+    bool isCB = false;
+    void _onCompleteCB();
+    
+
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //    RA8876 Parameters
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -664,41 +671,8 @@ public:
 using Print::write;
 
 private:
-	// int _xnscs, _xnreset;
-	int _mosi;
-	int _miso;
-	int _sclk;
 	int _cs;
 	int _rst;
-	int	_errorCode;
-	SPIClass *_pspi = nullptr;
-//	SPIClass::SPI_Hardware_t *_spi_hardware;
-
-  	uint8_t   	_spi_num;         	// Which buss is this spi on? 
-	uint32_t 	_SPI_CLOCK;			// #define ILI9341_SPICLOCK 30000000
-	uint32_t	_SPI_CLOCK_READ; 	//#define ILI9341_SPICLOCK_READ 2000000
-
-#if defined(KINETISK)
- 	KINETISK_SPI_t *_pkinetisk_spi;
-#elif defined(__IMXRT1052__) || defined(__IMXRT1062__)  // Teensy 4.x
- 	IMXRT_LPSPI_t *_pimxrt_spi;
-
-#elif defined(KINETISL)
- 	KINETISL_SPI_t *_pkinetisl_spi;
-#endif
-
-#ifdef SPI_HAS_TRANSFER_ASYNC
-	EventResponder finishedDMAEvent;
-#endif
-	// add support to allow only one hardware CS (used for dc)
-#if defined(__IMXRT1052__) || defined(__IMXRT1062__)  // Teensy 4.x
-    uint32_t _cspinmask;
-    volatile uint32_t *_csport;
-    uint32_t _spi_tcr_current;
-#else
-    uint8_t _cspinmask;
-    volatile uint8_t *_csport;
-#endif
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //    RA8876 Parameters
@@ -724,6 +698,8 @@ private:
 	uint16_t	_scrollXL,_scrollXR,_scrollYT,_scrollYB;
 	uint16_t	_TXTForeColor;
 	uint16_t	_TXTBackColor;
+
+    uint16_t _lastx1, _lastx2, _lasty1, _lasty2;
 	
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //    Font Parameters
@@ -902,10 +878,88 @@ protected:
 	void 					_disableCapISR(void);
 	volatile boolean	  	_needCTS_ISRrearm;
 	static void 			cts_isr(void);
-	TwoWire 				 *_wire=&Wire;
+	TwoWire 				 *_wire=&Wire2;
 	#endif	
 
+    static void ISR();
+    void flexIRQ_Callback();
+    static RA8876_t41_p *IRQcallback;
 
+    volatile bool WR_IRQTransferDone = true;
+
+};
+// To avoid conflict when also using Adafruit_GFX or any Adafruit library
+// which depends on Adafruit_GFX, #include the Adafruit library *BEFORE*
+// you #include ILI9341_t3.h.
+// Warning the implemention of class needs to be here, else the code
+// compiled in the c++ file will cause duplicate defines in the link phase. 
+//#ifndef _ADAFRUIT_GFX_H
+#ifdef Adafruit_GFX_Button
+#undef Adafruit_GFX_Button
+#endif
+#define Adafruit_GFX_Button RA8876_Button
+class RA8876_Button {
+public:
+	RA8876_Button(void) { _gfx = NULL; }
+	void initButton(RA8876_t41_p *gfx, int16_t x, int16_t y,
+		uint8_t w, uint8_t h,
+		uint16_t outline, uint16_t fill, uint16_t textcolor,
+		const char *label, uint8_t textsize_x, uint8_t textsize_y) {
+		_x = x;
+		_y = y;
+		_w = w;
+		_h = h;
+		_outlinecolor = outline;
+		_fillcolor = fill;
+		_textcolor = textcolor;
+		_textsize_x = textsize_x;
+		_textsize_y = textsize_y;
+		_gfx = gfx;
+		strncpy(_label, label, 9);
+		_label[9] = 0;
+
+	}
+	void drawButton(bool inverted = false) {
+		uint16_t fill, outline, text;
+
+		if (! inverted) {
+			fill = _fillcolor;
+			outline = _outlinecolor;
+			text = _textcolor;
+		} else {
+			fill =  _textcolor;
+			outline = _outlinecolor;
+			text = _fillcolor;
+		}
+		_gfx->fillRoundRect(_x - (_w/2), _y - (_h/2), _w, _h, min(_w,_h)/4,  min(_w,_h)/4, fill);
+		_gfx->drawRoundRect(_x - (_w/2), _y - (_h/2), _w, _h, min(_w,_h)/4,  min(_w,_h)/4, outline);
+		_gfx->setCursor(_x - strlen(_label)*3*_textsize_x, _y-4*_textsize_y);
+		_gfx->setTextColor(text);
+		_gfx->setTextSize(_textsize_x, _textsize_y);
+		_gfx->print(_label);
+	}
+
+	bool contains(int16_t x, int16_t y) {
+		if ((x < (_x - _w/2)) || (x > (_x + _w/2))) return false;
+		if ((y < (_y - _h/2)) || (y > (_y + _h/2))) return false;
+		return true;
+	}
+
+	void press(boolean p) {
+		laststate = currstate;
+		currstate = p;
+	}
+	bool isPressed() { return currstate; }
+	bool justPressed() { return (currstate && !laststate); }
+	bool justReleased() { return (!currstate && laststate); }
+private:
+	RA8876_t41_p *_gfx;
+	int16_t _x, _y;
+	uint16_t _w, _h;
+	uint8_t _textsize_x, _textsize_y;
+	uint16_t _outlinecolor, _fillcolor, _textcolor;
+	char _label[10];
+	boolean currstate, laststate;
 };
 
 #endif
