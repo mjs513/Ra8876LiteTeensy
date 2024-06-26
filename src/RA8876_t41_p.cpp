@@ -4967,7 +4967,6 @@ Serial.printf("writeRotatedRect %d %d %d %d (%x)\n", x, y, w, h, pcolors);
     uint16_t *pcolors_aligned = (uint16_t *)(((uintptr_t)pcolors + 32) & ~((uintptr_t)(31)));
 	switch (_rotation) {
 		case 0: 
-		case 2:
 			// Same as normal writeRect
           if(BUS_WIDTH == 8) {
 		    bteMpuWriteWithROPData8(currentPage, width(), start_x, start_y,  //Source 1 is ignored for ROP 12
@@ -4981,16 +4980,42 @@ Serial.printf("writeRotatedRect %d %d %d %d (%x)\n", x, y, w, h, pcolors);
                           ( const unsigned short *)pcolors_aligned);
 	      }
 			break;
+		case 2:
+			// Same as normal writeRect
+          if(BUS_WIDTH == 8) {
+		    bteMpuWriteWithROPData8(currentPage, width(), start_x, start_y,  //Source 1 is ignored for ROP 12
+                          currentPage, width(), (width()- w) - start_x, start_y, w, h,     //destination address, pagewidth, x/y, width/height
+                          RA8876_BTE_ROP_CODE_12,
+                          ( const unsigned char *)pcolors_aligned);
+          } else {
+		    bteMpuWriteWithROPData16(currentPage, width(), start_x, start_y,  //Source 1 is ignored for ROP 12
+                          currentPage, width(), (width()- w) - start_x, start_y, w, h,     //destination address, pagewidth, x/y, width/height
+                          RA8876_BTE_ROP_CODE_12,
+                          ( const unsigned short *)pcolors_aligned);
+	      }
+			break;
 		case 1:
-		case 3:
           if(BUS_WIDTH == 8) {
 		    bteMpuWriteWithROPData8(currentPage, height(), start_y, start_x,  //Source 1 is ignored for ROP 12
-                          currentPage, height(),  height() - start_y, start_x, h, w,     //destination address, pagewidth, x/y, width/height
+                          currentPage, height(),  start_y, start_x, h, w,     //destination address, pagewidth, x/y, width/height
                           RA8876_BTE_ROP_CODE_12,
                           ( const unsigned char *)pcolors_aligned);
           } else {
 		    bteMpuWriteWithROPData16(currentPage, height(), start_y, start_x,  //Source 1 is ignored for ROP 12
                           currentPage, height(),  start_y, start_x, h, w,     //destination address, pagewidth, x/y, width/height
+                          RA8876_BTE_ROP_CODE_12,
+                          ( const unsigned short *)pcolors_aligned);
+	      }
+			break;
+		case 3:
+          if(BUS_WIDTH == 8) {
+		    bteMpuWriteWithROPData8(currentPage, height(), start_y, start_x,  //Source 1 is ignored for ROP 12
+                          currentPage, height(),  (height()-h)-start_y, start_x, h, w,     //destination address, pagewidth, x/y, width/height
+                          RA8876_BTE_ROP_CODE_12,
+                          ( const unsigned char *)pcolors_aligned);
+          } else {
+		    bteMpuWriteWithROPData16(currentPage, height(), start_y, start_x,  //Source 1 is ignored for ROP 12
+                          currentPage, height(),  (height()-h)-start_y, start_x, h, w,     //destination address, pagewidth, x/y, width/height
                           RA8876_BTE_ROP_CODE_12,
                           ( const unsigned short *)pcolors_aligned);
 	      }
