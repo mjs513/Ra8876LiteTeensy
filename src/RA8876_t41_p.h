@@ -266,7 +266,6 @@ public:
 	uint32_t boxPut(uint32_t vPageAddr, uint16_t x0, uint16_t y0,uint16_t x1, uint16_t y1, uint16_t dx0, uint16_t dy0);
 	uint32_t boxGet(uint32_t vPageAddr, uint16_t x0, uint16_t y0,uint16_t x1, uint16_t y1, uint16_t dx0, uint16_t dy0);
 
-	
 	/*  Font Functions  */
 	//**[DBh]~[DEh]**//
 	void CGRAM_Start_address(uint32_t Addr);
@@ -339,6 +338,53 @@ public:
                                             uint16_t color1, uint16_t color2);
   void fillRectVGradient(int16_t x, int16_t y, int16_t w, int16_t h,
                                             uint16_t color1, uint16_t color2);
+
+  	// helper functions for some of the graphic primitives.
+    void beginWrite16BitColors();
+    void write16BitColor(uint16_t color);
+    void endWrite16BitColors();
+
+    // writeRect8BPP - 	write 8 bit per pixel paletted bitmap
+    //					bitmap data in array at pixels, one byte per
+    // pixel
+    //					color palette data in array at palette
+    void writeRect8BPP(int16_t x, int16_t y, int16_t w, int16_t h,
+                       const uint8_t *pixels, const uint16_t *palette);
+
+    // writeRect4BPP - 	write 4 bit per pixel paletted bitmap
+    //					bitmap data in array at pixels, 4 bits per
+    // pixel
+    //					color palette data in array at palette
+    //					width must be at least 2 pixels
+    void writeRect4BPP(int16_t x, int16_t y, int16_t w, int16_t h,
+                       const uint8_t *pixels, const uint16_t *palette);
+
+    // writeRect2BPP - 	write 2 bit per pixel paletted bitmap
+    //					bitmap data in array at pixels, 4 bits per
+    // pixel
+    //					color palette data in array at palette
+    //					width must be at least 4 pixels
+    void writeRect2BPP(int16_t x, int16_t y, int16_t w, int16_t h,
+                       const uint8_t *pixels, const uint16_t *palette);
+
+    // writeRect1BPP - 	write 1 bit per pixel paletted bitmap
+    //					bitmap data in array at pixels, 4 bits per
+    // pixel
+    //					color palette data in array at palette
+    //					width must be at least 8 pixels
+    void writeRect1BPP(int16_t x, int16_t y, int16_t w, int16_t h,
+                       const uint8_t *pixels, const uint16_t *palette);
+
+    // writeRectNBPP - 	write N(1, 2, 4, 8) bit per pixel paletted bitmap
+    //					bitmap data in array at pixels
+    //  Currently writeRect1BPP, writeRect2BPP, writeRect4BPP use this to do all
+    //  of the work.
+    //
+    void writeRectNBPP(int16_t x, int16_t y, int16_t w, int16_t h,
+                       uint8_t bits_per_pixel, const uint8_t *pixels,
+                       const uint16_t *palette);
+
+
 	 
 	/*BTE function*/
 	void bte_Source0_MemoryStartAddr(ru32 addr);

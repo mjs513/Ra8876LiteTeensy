@@ -15,13 +15,18 @@
 // Set which Display we are using and at what speed
 // Currently I have options for both MICROMOD and T42 to make it
 // easier for testing
-
+//#define use_spi
 
 #include <MemoryHexDump.h>
 
 #include <Teensy_Parallel_GFX.h>
 #include <Adafruit_GFX.h>  // Core graphics library
+#if defined(use_spi)
+#include <RA8876_t3.h>
+#else
 #include <RA8876_t41_p.h>
+#endif
+
 //#include "RA8876_t41_p.h"
 #include "font_Arial.h"
 #include "font_ArialBold.h"
@@ -53,16 +58,18 @@ uint8_t use_fb = 0;
 #define ORIGIN_TEST_X 50
 #define ORIGIN_TEST_Y 50
 
-#define TFT_CS 30
-#define TFT_RST 28
-#define RA8875_INT 6
-#define TFT_BL 29
 
+#if defined(use_spi)
+#define TFT_CS 10
+#define TFT_RST 9
+#define TFT_BL 29
+RA8876_t3 tft = RA8876_t3(TFT_CS, TFT_RST);
+#else
 uint8_t dc = 13;
 uint8_t cs = 11;
 uint8_t rst = 12;
 RA8876_t41_p tft = RA8876_t41_p(dc,cs,rst); //(dc, cs, rst)
-//RA8876_t3 tft = RA8876_t3(TFT_CS, TFT_RST);
+#endif
 
 
 void setup() {
@@ -97,9 +104,11 @@ void setup() {
     digitalWrite(TFT_BL, HIGH);
 #endif
 
-
+#if(use_spi)
+    tft.begin();
+#else
     tft.begin(20);
-
+#endif
     //  tft.setFrameBuffer(tft_frame_buffer);
     tft.backlight(true);
 
@@ -117,6 +126,7 @@ void setup() {
     //  button.initButton(&tft, 200, 125, 100, 40, GREEN, YELLOW, RED, "UP", 1, 1);
 
     drawTestScreen();
+
 }
 
 void SetupOrClearClipRectAndOffsets() {
@@ -501,18 +511,31 @@ void drawTestScreen() {
         *ppd8++ = palette_index;
         ppd16++;
     }
-//    tft.writeRect8BPP(200, 50, 50, 50, (uint8_t *)pixel_data, palette);
-    palette[0] = CYAN;
-    palette[1] = OLIVE;
-//    tft.writeRect1BPP(75, 100, 16, 16, pict1bpp, palette);
-//    tft.writeRect1BPP(320 - 90, 75, 16, 16, pict1bpp, palette);
+    tft.writeRect8BPP(200, 50, 50, 50, (uint8_t *)pixel_data, palette);
 
-    palette[2] = MAROON;
-    palette[3] = PINK;
-//    tft.writeRect2BPP(75, 125, 32, 16, pict2bpp, palette);
 
- //   tft.writeRectNBPP(15, 125, 32, 16, 2, pict2bpp, palette);
- //   tft.writeRectNBPP(75, 150, 16, 16, 4, pict4bpp, palette);
+
+    palette[0] = RED;
+    palette[1] = GREEN;
+    palette[2] = BLUE;
+    palette[3] = YELLOW;
+    uint8_t *pb = (uint8_t *)pixel_data;
+
+#define MEMSET_CNT 1000
+    memset(pb + MEMSET_CNT * 0, 0, MEMSET_CNT);
+    memset(pb + MEMSET_CNT * 1, 1, MEMSET_CNT);
+    memset(pb + MEMSET_CNT * 2, 2, MEMSET_CNT);
+    memset(pb + MEMSET_CNT * 3, 3, MEMSET_CNT);
+    tft.writeRect8BPP(100, 400, 100, (4 * MEMSET_CNT) / 100, pb, palette);
+
+
+    tft.writeRect1BPP(75, 100, 16, 16, pict1bpp, palette);
+    tft.writeRect1BPP(320 - 90, 75, 16, 16, pict1bpp, palette);
+
+    tft.writeRect2BPP(75, 125, 32, 16, pict2bpp, palette);
+
+    tft.writeRectNBPP(15, 125, 32, 16, 2, pict2bpp, palette);
+    tft.writeRectNBPP(75, 150, 16, 16, 4, pict4bpp, palette);
 
     // Try drawing button
     //tft.setFontAdafruit();
@@ -677,7 +700,7 @@ void drawGFXTextScreen(bool fOpaque) {
     tft.println("ABCDEFGHIJKLMNO");
     tft.println("abcdefghijklmno");
     tft.println("0123456789!@#$%^&*()_");
-    if(use_fb) tft.updateScreen();
+    if (use_fb) tft.updateScreen();
     tft.setTextSize(1);
     tft.setFont();
     Serial.printf("Use FB: %d OP: %d, DT: %d\n", use_fb, fOpaque, millis() - start_time);

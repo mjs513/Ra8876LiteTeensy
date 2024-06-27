@@ -1,21 +1,22 @@
 #include "Arduino.h"
-#include "RA8876_t41_p.h"
+#if defined(use_spi)
+#include <RA8876_t3.h>
+#else
+#include <RA8876_t41_p.h>
+#endif
 #include "font_Arial.h"
 
-
-// T4.1
-/*
-uint8_t dc = 8;
-uint8_t cs = 10;
-uint8_t rst = 9;
-
-RA8876_t41_p tft = RA8876_t41_p(cs,rst); 
-*/
+#if defined(use_spi)
+#define TFT_CS 10
+#define TFT_RST 9
+#define TFT_BL 29
+RA8876_t3 tft = RA8876_t3(TFT_CS, TFT_RST);
+#else
 uint8_t dc = 13;
 uint8_t cs = 11;
 uint8_t rst = 12;
-
 RA8876_t41_p tft = RA8876_t41_p(dc,cs,rst); //(dc, cs, rst)
+#endif
 
 // Array of Simple RA8876 Basic Colors
 PROGMEM uint16_t myColors[] = {
@@ -45,8 +46,11 @@ void setup() {
 //  pinMode(BACKLITE, OUTPUT);
 //  digitalWrite(BACKLITE, HIGH);
     
-  tft.begin(20); // 20 is working in 8bit and 16bit mode on T41
-
+#if(use_spi)
+    tft.begin();
+#else
+    tft.begin(20);
+#endif
   tft.graphicMode(true);
   tft.setTextCursor(0,0);
   tft.setFont(Arial_14);
@@ -87,17 +91,10 @@ void colorBar(uint8_t rotation){
   tft.fillRect(BAND_START_X + BAND_WIDTH * 7, BAND_START_Y, BAND_WIDTH, BAND_HEIGHT, 0xF81F);
   tft.printStatusLine(0,myColors[1],myColors[11], "Status Text");
   memset(pixel_data, 0, sizeof(pixel_data));
-  readRect(BAND_START_X, BAND_START_Y, BAND_WIDTH * 8, BAND_HEIGHT, pixel_data);
+  tft.readRect(BAND_START_X, BAND_START_Y, BAND_WIDTH * 8, BAND_HEIGHT, pixel_data);
   tft.writeRect(BAND_START_X, BAND_START_Y + BAND_HEIGHT, BAND_WIDTH * 8, BAND_HEIGHT, pixel_data);
 }
 
-void readRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t *pcolors) {
-  for(uint16_t j = y; j < (h + y); j++) {
-    for(uint16_t i = x; i < (w + x); i++) {
-      *pcolors++ = tft.getPixel(i, j);
-    }
-  }
-}
 
 //=============================================================================
 // Wait for user input

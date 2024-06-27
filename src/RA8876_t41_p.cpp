@@ -926,7 +926,7 @@ void RA8876_t41_p::lcdDataWrite(ru8 data, bool finalize) {
 // Read RA8876 parallel Data (8-bit read) 8/16 bit bus mode.
 //**************************************************************//
 ru8 RA8876_t41_p::lcdDataRead(bool finalize) {
-  uint16_t dummy = 0;
+  uint16_t dummy __attribute__((unused)) = 0;
   uint16_t data = 0;
 
   while(WR_IRQTransferDone == false) {} //Wait for any IRQ transfers to complete
@@ -1898,12 +1898,12 @@ ru16 RA8876_t41_p::readPixel(int16_t x, int16_t y) {
 
 ru16 RA8876_t41_p::getPixel(ru16 x,ru16 y) {
 	ru16 rdata = 0;
-  ru16 dummy = 0;
+  ru16 dummy __attribute__((unused)) = 0;
   
   selectScreen(currentPage);
-	graphicMode(true);
-	setPixelCursor(x, y);		          // set memory address
-	ramAccessPrepare();			          // Setup SDRAM Access
+  graphicMode(true);
+  setPixelCursor(x, y);		          // set memory address
+  ramAccessPrepare();			          // Setup SDRAM Access
   dummy = lcdDataRead();
   rdata = (lcdDataRead() & 0xff);		// read low byte
   rdata |= lcdDataRead() << 8;	    // add high byte 
@@ -5155,6 +5155,326 @@ Serial.printf("writeRotatedRect %d %d %d %d (%x)\n", x, y, w, h, pcolors);
 
 }
 
+
+// Helper functions.
+void RA8876_t41_p::beginWrite16BitColors() {
+  while(WR_IRQTransferDone == false) {} //Wait for any IRQ transfers to complete
+  FlexIO_Config_SnglBeat();
+  CSLow();
+  DCHigh();
+  delayNanoseconds(10);  // Initially setup for the T4.1 board
+  if(_rotation & 1) delayNanoseconds(20);
+}
+void RA8876_t41_p::write16BitColor(uint16_t color) {
+  delayNanoseconds(10);  // Initially setup for the T4.1 board
+  if(_rotation & 1) delayNanoseconds(20);
+
+  if(BUS_WIDTH == 8) {
+    while(0 == (p->SHIFTSTAT & (1 << 0))) {}
+    p->SHIFTBUF[0] = color & 0xff;
+
+    while(0 == (p->SHIFTSTAT & (1 << 0))) {}
+    p->SHIFTBUF[0] = color >> 8;
+  } else {
+    while(0 == (p->SHIFTSTAT & (1 << 0))) {}
+    p->SHIFTBUF[0] = color;
+  }
+
+}
+void RA8876_t41_p::endWrite16BitColors() {
+  // De-assert /CS pin
+  while(0 == (p->TIMSTAT & (1 << 0))) {}
+  delayNanoseconds(10);  // Initially setup for the T4.1 board
+  CSHigh();
+}
+
+// writeRect8BPP -  write 8 bit per pixel paletted bitmap
+//          bitmap data in array at pixels, one byte per
+// pixel
+//          color palette data in array at palette
+void RA8876_t41_p::writeRect8BPP(int16_t x, int16_t y, int16_t w, int16_t h,
+                                        const uint8_t *pixels,
+                                        const uint16_t *palette) {
+    // Serial.printf("\nWR8: %d %d %d %d %x\n", x, y, w, h, (uint32_t)pixels);
+    
+    if (x == CENTER) x = (_width - w) / 2;
+    if (y == CENTER) y = (_height - h) / 2;
+
+    int16_t start_x = (x != CENTER) ? x : (_width - w) / 2;
+    int16_t start_y = (y != CENTER) ? y : (_height - h) / 2;
+
+    x += _originx;
+    y += _originy;
+    int16_t w_pixels = w; // initial w passed in...
+
+    uint16_t x_clip_left =
+        0; // How many entries at start of colors to skip at start of row
+    uint16_t x_clip_right =
+        0; // how many color entries to skip at end of row for clipping
+    // Rectangular clipping
+
+    // See if the whole thing out of bounds...
+    if ((x >= _displayclipx2) || (y >= _displayclipy2))
+        return;
+    if (((x + w) <= _displayclipx1) || ((y + h) <= _displayclipy1))
+        return;
+
+    // In these cases you can not do simple clipping, as we need to synchronize
+    // the colors array with the
+    // We can clip the height as when we get to the last visible we don't have to
+    // go any farther.
+    // also maybe starting y as we will advance the color array.
+    if (y < _displayclipy1) {
+        int dy = (_displayclipy1 - y);
+        h -= dy;
+        pixels += (dy * w); // Advance color array to
+        y = _displayclipy1;
+    }
+
+    if ((y + h - 1) >= _displayclipy2)
+        h = _displayclipy2 - y;
+
+    // For X see how many items in color array to skip at start of row and
+    // likewise end of row
+    if (x < _displayclipx1) {
+        x_clip_left = _displayclipx1 - x;
+        w -= x_clip_left;
+        x = _displayclipx1;
+    }
+    if ((x + w - 1) >= _displayclipx2) {
+        x_clip_right = w;
+        w = _displayclipx2 - x;
+        x_clip_right -= w;
+    }
+    // Serial.printf("WR8C: %d %d %d %d %x- %d %d\n", x, y, w, h, (uint32_t)pixels,
+    // x_clip_right, x_clip_left);
+    // BUGBUG may have to do this, by rotation, similar to the writeRect, except we unroll the
+    // the bteMpuWriteWithROPData8 or bteMpuWriteWithROPData16
+    switch (_rotation) {
+    case 0:
+      {
+        // normal mode should be able to do all at once.
+        bteMpuWriteWithROP(currentPage, width(), x, y,  //Source 1 is ignored for ROP 12
+                            currentPage, width(), x, y, w, h,     //destination address, pagewidth, x/y, width/height
+                            RA8876_BTE_ROP_CODE_12);
+        // call helper function to setup to write the different pixels.
+        beginWrite16BitColors();
+        for (y = h; y > 0; y--) {
+            pixels += x_clip_left;
+            // Serial.printf("%x: ", (uint32_t)pixels);
+            for (x = w; x > 1; x--) {
+                // Serial.print(*pixels, DEC);
+                write16BitColor(palette[*pixels++]);
+            }
+            // Serial.println(*pixels, DEC);
+            write16BitColor(palette[*pixels++]);
+            pixels += x_clip_right;
+        }
+        endWrite16BitColors();
+      }
+      break;
+    case 1:
+      {
+        uint16_t buffer[w] __attribute__((aligned(32)));
+        while (h) {
+          for (int i = 0; i < w; i++) buffer[w-i-1] = palette[*pixels++];
+          //Serial.printf("DP %x, %d, %d %d\n", rotated_row, h, start_x, y);
+            if(BUS_WIDTH == 8) {
+              bteMpuWriteWithROPData8(currentPage, height(), start_y, start_x,  //Source 1 is ignored for ROP 12
+                                currentPage, height(),  start_y, start_x, 1, w,     //destination address, pagewidth, x/y, width/height
+                                RA8876_BTE_ROP_CODE_12,
+                                ( const unsigned char *)buffer);
+            } else {
+              bteMpuWriteWithROPData16(currentPage, height(), start_y, start_x,  //Source 1 is ignored for ROP 12
+                                currentPage, height(),  start_y, start_x, 1, w,     //destination address, pagewidth, x/y, width/height
+                                RA8876_BTE_ROP_CODE_12,
+                                (const unsigned short *)buffer);
+                }
+            start_y++;
+            h--;
+            //pcolors += w;
+        }
+
+      }
+      break;
+    case 2:
+      {
+        uint16_t rotated_buffer[w] __attribute__((aligned(32)));
+
+        while (h) {
+          for (int i = 0; i < w; i++) rotated_buffer[w-i-1] = palette[*pixels++];
+          if(BUS_WIDTH == 8) {
+              bteMpuWriteWithROPData8(currentPage, width(), start_x, start_y,  //Source 1 is ignored for ROP 12
+                              currentPage, width(), (width()- w) - start_x , start_y, w, 1,     //destination address, pagewidth, x/y, width/height
+                              RA8876_BTE_ROP_CODE_12,
+                              ( const unsigned char *)rotated_buffer);
+            } else {
+              bteMpuWriteWithROPData16(currentPage, width(), start_x, start_y,  //Source 1 is ignored for ROP 12
+                              currentPage, width(), (width()- w) - start_x, start_y, w, 1,     //destination address, pagewidth, x/y, width/height
+                              RA8876_BTE_ROP_CODE_12,
+                              ( const unsigned short *)rotated_buffer);
+            }         
+            start_y++;
+            h--;
+        }
+      }
+      break;
+    case 3:
+      {
+        start_y += h;
+        uint16_t buffer[w] __attribute__((aligned(32)));
+        while (h) {
+          for (int i = 0; i < w; i++) buffer[w-i-1] = palette[*pixels++];
+          //Serial.printf("DP %x, %d, %d %d\n", rotated_row, h, start_x, y);
+            if(BUS_WIDTH == 8) {
+              bteMpuWriteWithROPData8(currentPage, height(), start_y, start_x,  //Source 1 is ignored for ROP 12
+                                currentPage, height(), height() - start_y, start_x, 1, w,     //destination address, pagewidth, x/y, width/height
+                                RA8876_BTE_ROP_CODE_12,
+                                ( const unsigned char *)buffer);
+                                
+            } else {
+              bteMpuWriteWithROPData16(currentPage, height(), start_y, start_x,  //Source 1 is ignored for ROP 12
+                                currentPage, height(),  height() - start_y, start_x, 1, w,     //destination address, pagewidth, x/y, width/height
+                                RA8876_BTE_ROP_CODE_12,
+                                ( const unsigned short *)buffer);
+            }
+            start_y--;
+            h--;
+            //pcolors += w;
+        }
+      }
+      break;
+
+    }
+}
+
+// writeRect4BPP -  write 4 bit per pixel paletted bitmap
+//          bitmap data in array at pixels, 4 bits per
+// pixel
+//          color palette data in array at palette
+//          width must be at least 2 pixels
+void RA8876_t41_p::writeRect4BPP(int16_t x, int16_t y, int16_t w, int16_t h,
+                                        const uint8_t *pixels,
+                                        const uint16_t *palette) {
+    // Simply call through our helper
+    writeRectNBPP(x, y, w, h, 4, pixels, palette);
+}
+
+// writeRect2BPP -  write 2 bit per pixel paletted bitmap
+//          bitmap data in array at pixels, 4 bits per
+// pixel
+//          color palette data in array at palette
+//          width must be at least 4 pixels
+void RA8876_t41_p::writeRect2BPP(int16_t x, int16_t y, int16_t w, int16_t h,
+                                        const uint8_t *pixels,
+                                        const uint16_t *palette) {
+    // Simply call through our helper
+    writeRectNBPP(x, y, w, h, 2, pixels, palette);
+}
+
+///============================================================================
+// writeRect1BPP -  write 1 bit per pixel paletted bitmap
+//          bitmap data in array at pixels, 4 bits per
+// pixel
+//          color palette data in array at palette
+//          width must be at least 8 pixels
+void RA8876_t41_p::writeRect1BPP(int16_t x, int16_t y, int16_t w, int16_t h,
+                                        const uint8_t *pixels,
+                                        const uint16_t *palette) {
+    // Simply call through our helper
+    writeRectNBPP(x, y, w, h, 1, pixels, palette);
+}
+
+///============================================================================
+// writeRectNBPP -  write N(1, 2, 4, 8) bit per pixel paletted bitmap
+//          bitmap data in array at pixels
+//  Currently writeRect1BPP, writeRect2BPP, writeRect4BPP use this to do all of
+//  the work.
+void RA8876_t41_p::writeRectNBPP(int16_t x, int16_t y, int16_t w, int16_t h,
+                                        uint8_t bits_per_pixel, const uint8_t *pixels,
+                                        const uint16_t *palette) {
+    // Serial.printf("\nWR8: %d %d %d %d %x\n", x, y, w, h, (uint32_t)pixels);
+    x += _originx;
+    y += _originy;
+    uint8_t pixels_per_byte = 8 / bits_per_pixel;
+    uint16_t count_of_bytes_per_row =
+        (w + pixels_per_byte - 1) /
+        pixels_per_byte; // Round up to handle non multiples
+    uint8_t row_shift_init =
+        8 - bits_per_pixel;                             // We shift down 6 bits by default
+    uint8_t pixel_bit_mask = (1 << bits_per_pixel) - 1; // get mask to use below
+    // Rectangular clipping
+
+    // See if the whole thing out of bounds...
+    if ((x >= _displayclipx2) || (y >= _displayclipy2))
+        return;
+    if (((x + w) <= _displayclipx1) || ((y + h) <= _displayclipy1))
+        return;
+
+    // In these cases you can not do simple clipping, as we need to synchronize
+    // the colors array with the
+    // We can clip the height as when we get to the last visible we don't have to
+    // go any farther.
+    // also maybe starting y as we will advance the color array.
+    // Again assume multiple of 8 for width
+    if (y < _displayclipy1) {
+        int dy = (_displayclipy1 - y);
+        h -= dy;
+        pixels += dy * count_of_bytes_per_row;
+        y = _displayclipy1;
+    }
+
+    if ((y + h - 1) >= _displayclipy2)
+        h = _displayclipy2 - y;
+
+    // For X see how many items in color array to skip at start of row and
+    // likewise end of row
+    if (x < _displayclipx1) {
+        uint16_t x_clip_left = _displayclipx1 - x;
+        w -= x_clip_left;
+        x = _displayclipx1;
+        // Now lets update pixels to the rigth offset and mask
+        uint8_t x_clip_left_bytes_incr = x_clip_left / pixels_per_byte;
+        pixels += x_clip_left_bytes_incr;
+        row_shift_init =
+            8 -
+            (x_clip_left - (x_clip_left_bytes_incr * pixels_per_byte) + 1) *
+                bits_per_pixel;
+    }
+
+    if ((x + w - 1) >= _displayclipx2) {
+        w = _displayclipx2 - x;
+    }
+
+    const uint8_t *pixels_row_start = pixels; // remember our starting position offset into row
+
+
+    // Complete hack
+    // sort of complete hack:
+    uint16_t buffer[w] __attribute__((aligned(32)));
+    //setAddr(x, y, x + w - 1, y + h - 1);
+    for (; h > 0; h--) {
+        pixels = pixels_row_start;            // setup for this row
+        uint8_t pixel_shift = row_shift_init; // Setup mask
+        uint16_t *pb = buffer;
+        for (int i = 0; i < w; i++) {
+            *pb++ = palette[((*pixels) >> pixel_shift) & pixel_bit_mask];
+            if (!pixel_shift) {
+                pixel_shift = 8 - bits_per_pixel; // setup next mask
+                pixels++;
+            } else {
+                pixel_shift -= bits_per_pixel;
+            }
+        }
+        writeRect(x, y, w, 1, buffer);
+        y++;
+        pixels_row_start += count_of_bytes_per_row;
+    }
+    endWrite16BitColors();
+}
+
+
+
 // Draw a round rectangle. 
 void RA8876_t41_p::drawRoundRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t xr, uint16_t yr, uint16_t color) {
 	x += _originx;
@@ -7017,7 +7337,8 @@ Vertical Scan direction
 1 : From bottom to Top
 PIP window will be disabled when VDIR set as 1.
 */
-	unsigned char temp, temp_in;
+  unsigned char temp;
+  unsigned char temp_in;
 	
 	temp_in =  temp = lcdRegDataRead(RA8876_DPCR);
 	temp |= cSetb3;
