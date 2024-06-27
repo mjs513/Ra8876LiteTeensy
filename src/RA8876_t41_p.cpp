@@ -1892,6 +1892,10 @@ void RA8876_t41_p::graphicMode(boolean on) {
 //**************************************************************//
 /* Read a 16bpp pixel                                           */
 //**************************************************************//
+ru16 RA8876_t41_p::readPixel(int16_t x, int16_t y) {
+    return getPixel(x, y);
+}
+
 ru16 RA8876_t41_p::getPixel(ru16 x,ru16 y) {
 	ru16 rdata = 0;
   ru16 dummy = 0;
@@ -1904,6 +1908,14 @@ ru16 RA8876_t41_p::getPixel(ru16 x,ru16 y) {
   rdata = (lcdDataRead() & 0xff);		// read low byte
   rdata |= lcdDataRead() << 8;	    // add high byte 
  	return rdata;
+}
+
+void RA8876_t41_p::readRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t *pcolors) {
+  for(uint16_t j = y; j < (h + y); j++) {
+    for(uint16_t i = x; i < (w + x); i++) {
+      *pcolors++ = getPixel(i, j);
+    }
+  }
 }
 
 //**************************************************************//
@@ -3413,7 +3425,7 @@ ru16 des_x,ru16 des_y,ru16 width,ru16 height,ru8 rop_code,const unsigned char *d
   DCHigh();
   for(j=0;j<height;j++) {
 	for(i=0;i<width;i++) {
-  //delayNanoseconds(10);  // Initially setup for the T4.1 board
+  delayNanoseconds(10);  // Initially setup for the T4.1 board
       if(_rotation & 1) delayNanoseconds(20);
       p->SHIFTBUF[0] = *data++;
       // Wait for transfer to be completed
@@ -3447,7 +3459,7 @@ ru16 des_x,ru16 des_y,ru16 width,ru16 height,ru8 rop_code,const unsigned short *
   DCHigh();
   for(j=0;j<height;j++) {
 	for(i=0;i<width;i++) {
-delayNanoseconds(10);   // Initially setup for the T4.1 board
+  delayNanoseconds(10);   // Initially setup for the T4.1 board
       if(_rotation & 1) delayNanoseconds(70);
       p->SHIFTBUF[0] = *data++;
       /*Wait for transfer to be completed */
@@ -4817,6 +4829,105 @@ void RA8876_t41_p::fillRect(int16_t x, int16_t y, int16_t w, int16_t h,uint16_t 
   lcdRegDataWrite(RA8876_DCR1,RA8876_DRAW_SQUARE_FILL, true);//76h,0xE0  
 
 }
+
+// fillRectHGradient	- fills area with horizontal gradient
+void RA8876_t41_p::fillRectHGradient(int16_t x, int16_t y, int16_t w, int16_t h,
+                                            uint16_t color1, uint16_t color2) {
+  x += _originx;
+  y += _originy;
+
+  // Rectangular clipping
+  if ((x >= _displayclipx2) || (y >= _displayclipy2))
+      return;
+  if (x < _displayclipx1) {
+      w -= (_displayclipx1 - x);
+      x = _displayclipx1;
+  }
+  if (y < _displayclipy1) {
+      h -= (_displayclipy1 - y);
+      y = _displayclipy1;
+  }
+  if ((x + w - 1) >= _displayclipx2)
+      w = _displayclipx2 - x;
+  if ((y + h - 1) >= _displayclipy2)
+      h = _displayclipy2 - y;
+
+  int16_t r1, g1, b1, r2, g2, b2, dr, dg, db, r, g, b;
+  uint16_t color;
+  color565toRGB14(color1, r1, g1, b1);
+  color565toRGB14(color2, r2, g2, b2);
+  dr = (r2 - r1) / w;
+  dg = (g2 - g1) / w;
+  db = (b2 - b1) / w;
+  r = r1;
+  g = g1;
+  b = b1;
+  
+  check2dBusy();
+  graphicMode(true);
+  for (y = h; y > 0; y--) {
+      for (x = w; x > 1; x--) {
+          color = RGB14tocolor565(r, g, b);
+          drawPixel(x, y, color);
+          r += dr;
+          g += dg;
+          b += db;
+      }
+      color = RGB14tocolor565(r, g, b);
+      drawPixel(x, y, color);
+      r = r1;
+      g = g1;
+      b = b1;
+  }
+}
+    
+
+void RA8876_t41_p::fillRectVGradient(int16_t x, int16_t y, int16_t w, int16_t h,
+                                            uint16_t color1, uint16_t color2) {
+    x += _originx;
+    y += _originy;
+
+    // Rectangular clipping
+    if ((x >= _displayclipx2) || (y >= _displayclipy2))
+        return;
+    if (x < _displayclipx1) {
+        w -= (_displayclipx1 - x);
+        x = _displayclipx1;
+    }
+    if (y < _displayclipy1) {
+        h -= (_displayclipy1 - y);
+        y = _displayclipy1;
+    }
+    if ((x + w - 1) >= _displayclipx2)
+        w = _displayclipx2 - x;
+    if ((y + h - 1) >= _displayclipy2)
+        h = _displayclipy2 - y;
+
+    int16_t r1, g1, b1, r2, g2, b2, dr, dg, db, r, g, b;
+    color565toRGB14(color1, r1, g1, b1);
+    color565toRGB14(color2, r2, g2, b2);
+    dr = (r2 - r1) / h;
+    dg = (g2 - g1) / h;
+    db = (b2 - b1) / h;
+    r = r1;
+    g = g1;
+    b = b1;
+    
+    check2dBusy();
+    graphicMode(true);
+    for (y = h; y > 0; y--) {
+        uint16_t color = RGB14tocolor565(r, g, b);
+        for (x = w; x > 1; x--) {
+          drawPixel(x, y, color);
+        }
+        drawPixel(x, y, color);
+        r += dr;
+        g += dg;
+        b += db;
+    }
+
+}
+
 
 void RA8876_t41_p::writeRect(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t *pcolors) {
 	uint16_t start_x = (x != CENTER) ? x : (_width - w) / 2;
