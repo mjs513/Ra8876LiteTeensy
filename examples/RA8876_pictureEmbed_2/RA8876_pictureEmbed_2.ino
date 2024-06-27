@@ -4,31 +4,38 @@
 // By Frank Bösing
 //
 // https://forum.pjrc.com/threads/32601-SPI-Library-Issue-w-ILI9341-TFT-amp-PN532-NFC-Module-on-Teensy-3-2?p=94534&viewfull=1#post94534
-
-#define use_spi
-#if defined(use_spi)
 #include <SPI.h>
-#include <RA8876_t3.h>
-#else
 #include <RA8876_t41_p.h>
-#endif
 #include "_font_ComicSansMS.h"
 
 //#define USE_SPI1
 #define USE_WRITERECT
 //#define USE_PUTPICTURE
 
+//#define RA8876_CS 10
+//#define RA8876_RESET 8
+#define BACKLITE 5 // was 7 //External backlight control connected to this Arduino pin
+//RA8876_t3 tft = RA8876_t3(RA8876_CS, RA8876_RESET); //Using standard SPI pins
 
-#if defined(use_spi)
-#define TFT_CS 10
-#define TFT_RST 9
-RA8876_t3 tft = RA8876_t3(TFT_CS, TFT_RST);
-#else
+/*
+// MicroMod
+uint8_t dc = 13;
+uint8_t cs = 11;
+uint8_t rst = 5;
+*/
+/*
+// SDRAM DEV board V4.0
+uint8_t dc = 17;
+uint8_t cs = 14;
+uint8_t rst = 27;
+*/
+
+// T4.1
 uint8_t dc = 13;
 uint8_t cs = 11;
 uint8_t rst = 12;
+
 RA8876_t41_p tft = RA8876_t41_p(dc,cs,rst); //(dc, cs, rst)
-#endif
 
 uint8_t rotation = 0;
 
@@ -69,11 +76,8 @@ void setup() {
   while (!Serial && millis() < 5000) ;
   Serial.printf("\n\nStart RA8876 picture embed test"); Serial.flush();
 
-#if defined(use_spi)
-  tft.begin();
-#else
   tft.begin(20);
-#endif
+
   tft.backlight(1);
   Serial.printf("Screen Width:%d Height: %d\n", tft.width(), tft.height());
   tft.fillScreen(BLACK);
@@ -128,6 +132,7 @@ void loop(void) {
   tft.printf("Rotation: %d", rotation);
   if (DelayOrStep()) return;
   rotation = (rotation + 1) & 0x3;
+  tft.printf("Rotation: %d", rotation);
 
   Serial.print("Display Front of card ");
   drawImage(240, 320, (uint16_t*)teensy40_pinout1, RED, false);
