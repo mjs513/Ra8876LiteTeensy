@@ -4865,16 +4865,16 @@ void RA8876_t41_p::fillRectHGradient(int16_t x, int16_t y, int16_t w, int16_t h,
   
   check2dBusy();
   graphicMode(true);
-  for (y = h; y > 0; y--) {
-      for (x = w; x > 1; x--) {
+  for (uint16_t j = h; j > 0; j--) { //y
+      for (uint16_t i = w; i > 0; i--) { //x
           color = RGB14tocolor565(r, g, b);
-          drawPixel(x, y, color);
+          drawPixel(x + i, y + j, color);
           r += dr;
           g += dg;
           b += db;
       }
-      color = RGB14tocolor565(r, g, b);
-      drawPixel(x, y, color);
+      //color = RGB14tocolor565(r, g, b);
+      //drawPixel(x, y, color);
       r = r1;
       g = g1;
       b = b1;
@@ -4915,12 +4915,13 @@ void RA8876_t41_p::fillRectVGradient(int16_t x, int16_t y, int16_t w, int16_t h,
     
     check2dBusy();
     graphicMode(true);
-    for (y = h; y > 0; y--) {
+    
+    for (uint16_t j = h; j > 0; j--) {
         uint16_t color = RGB14tocolor565(r, g, b);
-        for (x = w; x > 1; x--) {
-          drawPixel(x, y, color);
+        for (uint16_t i = w; i > 0; i--) {
+          drawPixel(x + i , y + j, color);
         }
-        drawPixel(x, y, color);
+        //drawPixel(x + i , y + j, color);
         r += dr;
         g += dg;
         b += db;
