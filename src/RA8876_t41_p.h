@@ -313,7 +313,7 @@ public:
 	void clearStatusLine(uint16_t color); 
 	
 	/* Pseudo Frame Buffer Support */
-	void useCanvas();
+	void useCanvas(boolean on);
 	void updateScreen();
 	
 	 

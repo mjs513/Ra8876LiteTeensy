@@ -4330,17 +4330,36 @@ void RA8876_t41_p::restoreTFTParams(tftSave_t *screenSave) {
 	 _TXTBackColor = screenSave->TXTBackColor;
 }
 
-void RA8876_t41_p::useCanvas() {
-	displayImageStartAddress(PAGE1_START_ADDR);
-	displayImageWidth(_width);
-	displayWindowStartXY(0,0);
-	
-	canvasImageStartAddress(PAGE2_START_ADDR);
-	canvasImageWidth(_width);
-	activeWindowXY(0, 0);
-	activeWindowWH(_width, _height);
-	check2dBusy();
-	ramAccessPrepare();
+void RA8876_t41_p::useCanvas(boolean on) {
+  if(on) {
+    displayImageStartAddress(PAGE1_START_ADDR);
+    displayImageWidth(_width);
+    displayWindowStartXY(0,0);
+    
+    canvasImageStartAddress(PAGE2_START_ADDR);
+    canvasImageWidth(_width);
+    activeWindowXY(0, 0);
+    activeWindowWH(_width, _height);
+    currentPage = PAGE2_START_ADDR;
+    pageOffset = PAGE2_START_ADDR;
+    check2dBusy();
+    ramAccessPrepare();
+    
+  } else {
+    displayImageStartAddress(PAGE1_START_ADDR);
+    displayImageWidth(_width);
+    displayWindowStartXY(0,0);
+    
+    canvasImageStartAddress(PAGE1_START_ADDR);
+    canvasImageWidth(_width);
+    activeWindowXY(0, 0);
+    activeWindowWH(_width, _height);
+    currentPage = PAGE1_START_ADDR;
+    pageOffset = PAGE1_START_ADDR;
+    check2dBusy();
+    ramAccessPrepare();
+    
+  }
 }
 
 void RA8876_t41_p::updateScreen() {

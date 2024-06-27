@@ -134,7 +134,7 @@ void SetupOrClearClipRectAndOffsets() {
         int w = tft.width() / 2;
         int h = tft.height() / 2;
         tft.drawRect(x, y, w, h, ORANGE);
-        tft.updateScreen();
+        if(use_fb) tft.updateScreen();
         tft.setClipRect(x + 1, y + 1, w - 2, h - 2);
         delay(250);
 
@@ -419,6 +419,7 @@ void drawTestScreen() {
     Serial.printf("Use FB: %d ", use_fb);
     Serial.flush();
     //tft.useFrameBuffer(use_fb);
+    tft.useCanvas(use_fb);
     SetupOrClearClipRectAndOffsets();
     uint32_t start_time = millis();
     tft.fillScreen(use_fb ? RED : BLACK);
@@ -540,7 +541,8 @@ void drawTestScreen() {
 //    if (use_dma) {
 //        tft.updateScreenAsync();
 //    } else {
-//        tft.updateScreen();
+      if(use_fb)
+        tft.updateScreen();
 //    }
 
     Serial.println(millis() - start_time, DEC);
@@ -577,6 +579,7 @@ void drawTextScreen(bool fOpaque) {
     tft.setTextSize(1);
     uint32_t start_time = millis();
     //tft.useFrameBuffer(use_fb);
+    tft.useCanvas(use_fb);
     tft.fillScreen(use_fb ? RED : BLACK);
     tft.setFont(Arial_28_Bold);
     //t  tft.setFont(Arial_40_Bold);
@@ -647,7 +650,7 @@ void drawTextScreen(bool fOpaque) {
     tft.setTextSize(1);
 
 
-    //tft.updateScreen();
+    if(use_fb) tft.updateScreen();
     Serial.printf("Use FB: %d OP: %d, DT: %d OR: %d\n", use_fb, fOpaque, use_set_origin, millis() - start_time);
 }
 
@@ -662,6 +665,7 @@ void drawGFXTextScreen(bool fOpaque) {
         tft.setTextColor(WHITE);
     uint32_t start_time = millis();
     //tft.useFrameBuffer(use_fb);
+    tft.useCanvas(use_fb);
     tft.fillScreen(use_fb ? RED : BLACK);
     tft.setFont(&FreeMonoBoldOblique12pt7b);
     tft.println("MonoBold");
@@ -673,7 +677,7 @@ void drawGFXTextScreen(bool fOpaque) {
     tft.println("ABCDEFGHIJKLMNO");
     tft.println("abcdefghijklmno");
     tft.println("0123456789!@#$%^&*()_");
-    //tft.updateScreen();
+    if(use_fb) tft.updateScreen();
     tft.setTextSize(1);
     tft.setFont();
     Serial.printf("Use FB: %d OP: %d, DT: %d\n", use_fb, fOpaque, millis() - start_time);
