@@ -147,12 +147,20 @@ class RA8876_common : public Print {
     /*access*/
     virtual void lcdRegWrite(ru8 reg, bool finalize = true) {};
     virtual void lcdDataWrite(ru8 data, bool finalize = true) {};
-    virtual ru8 lcdDataRead(bool finalize = true) { return 0; };
-    virtual ru8 lcdStatusRead(bool finalize = true) { return 0; };
+    virtual ru8 lcdDataRead(bool finalize = true);
+    virtual ru8 lcdStatusRead(bool finalize = true);
     virtual void lcdRegDataWrite(ru8 reg, ru8 data, bool finalize = 0) {};
-    virtual ru8 lcdRegDataRead(ru8 reg, bool finalize = true) { return 0; };
+    virtual ru8 lcdRegDataRead(ru8 reg, bool finalize = true);
     virtual void lcdDataWrite16bbp(ru16 data, bool finalize = true) {};
     virtual void lcdDataWrite16(uint16_t data, bool finalize = true) {};
+
+    /*BTE function*/
+    virtual void bteMpuWriteWithROPData8(ru32 s1_addr, ru16 s1_image_width, ru16 s1_x, ru16 s1_y, ru32 des_addr, ru16 des_image_width,
+                                         ru16 des_x, ru16 des_y, ru16 width, ru16 height, ru8 rop_code, const unsigned char *data) {};
+    virtual void bteMpuWriteWithROPData16(ru32 s1_addr, ru16 s1_image_width, ru16 s1_x, ru16 s1_y, ru32 des_addr, ru16 des_image_width,
+                                          ru16 des_x, ru16 des_y, ru16 width, ru16 height, ru8 rop_code, const unsigned short *data) {};
+    virtual void bteMpuWriteWithROP(ru32 s1_addr, ru16 s1_image_width, ru16 s1_x, ru16 s1_y, ru32 des_addr, ru16 des_image_width,
+                                    ru16 des_x, ru16 des_y, ru16 width, ru16 height, ru8 rop_code) {};
 
     virtual void beginWrite16BitColors() {};
     virtual void write16BitColor(uint16_t color) {};
@@ -165,14 +173,6 @@ class RA8876_common : public Print {
     void putPicture_16bpp(ru16 x, ru16 y, ru16 width, ru16 height) {};                                   // not recommended: use BTE instead
     void putPicture_16bppData8(ru16 x, ru16 y, ru16 width, ru16 height, const unsigned char *data) {};   // not recommended: use BTE instead
     void putPicture_16bppData16(ru16 x, ru16 y, ru16 width, ru16 height, const unsigned short *data) {}; // not recommended: use BTE instead
-
-    /*BTE function*/
-    void bteMpuWriteWithROPData8(ru32 s1_addr, ru16 s1_image_width, ru16 s1_x, ru16 s1_y, ru32 des_addr, ru16 des_image_width,
-                                 ru16 des_x, ru16 des_y, ru16 width, ru16 height, ru8 rop_code, const unsigned char *data) {};
-    void bteMpuWriteWithROPData16(ru32 s1_addr, ru16 s1_image_width, ru16 s1_x, ru16 s1_y, ru32 des_addr, ru16 des_image_width,
-                                  ru16 des_x, ru16 des_y, ru16 width, ru16 height, ru8 rop_code, const unsigned short *data) {};
-    void bteMpuWriteWithROP(ru32 s1_addr, ru16 s1_image_width, ru16 s1_x, ru16 s1_y, ru32 des_addr, ru16 des_image_width,
-                            ru16 des_x, ru16 des_y, ru16 width, ru16 height, ru8 rop_code) {};
 
     volatile bool RA8876_BUSY; // This is used to show an transaction is in progress.
     void textRotate(boolean on);
@@ -704,6 +704,7 @@ class RA8876_common : public Print {
 
     using Print::write;
 
+  protected:
     int16_t _width, _height;
     uint8_t _rotation;
     uint16_t BUS_WIDTH;
@@ -917,6 +918,7 @@ class RA8876_common : public Print {
     TwoWire *_wire = &Wire2;
 #endif
 };
+
 // To avoid conflict when also using Adafruit_GFX or any Adafruit library
 // which depends on Adafruit_GFX, #include the Adafruit library *BEFORE*
 // you #include ILI9341_t3.h.
