@@ -46,6 +46,8 @@
 */
 #include "Cube_172.h"
 
+//#define use_spi
+#if defined(use_spi)
 #include <RA8876_t3.h>
 #else
 #include <RA8876_t41_p.h>
@@ -162,12 +164,15 @@ void setup() {
   Serial.print(__DATE__);
   Serial.print(" at ");
   Serial.println(__TIME__);
+#if defined(use_spi)
   Serial.print("SPI transfer speed ");
 //  Serial.print((float)tft.SPIspeed / 1000000, 1);
   Serial.print((float)SPIspeed / 1000000, 1);
   Serial.print("MHz");
+#endif
   Serial.println("\n");
 
+#if defined(BACKLITE)
   //I'm guessing most copies of this display are using external PWM
   //backlight control instead of the internal RA8876 PWM.
   //Connect a Teensy pin to pin 14 on the display.
@@ -176,6 +181,7 @@ void setup() {
 //  analogWriteFrequency(BACKLITE, 1000000);
   digitalWrite(BACKLITE, HIGH);
 //  analogWrite(BACKLITE, 256);
+#endif
 
 #if defined(use_spi)
   tft.begin(); 

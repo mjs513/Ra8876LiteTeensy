@@ -62,9 +62,11 @@ void setup() {
   //backlight control instead of the internal RA8876 PWM.
   //Connect a Teensy pin to pin 14 on the display.
   //Can use analogWrite() but I suggest you increase the PWM frequency first so it doesn't sing.
+#if defined(BACKLITE)
   pinMode(BACKLITE, OUTPUT);
   digitalWrite(BACKLITE, HIGH);
-    
+#endif 
+
 #if defined(use_spi)
   tft.begin(); 
 #else

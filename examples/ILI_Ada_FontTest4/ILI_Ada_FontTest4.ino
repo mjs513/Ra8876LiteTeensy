@@ -1,7 +1,7 @@
 #include <Adafruit_GFX.h>
 
 #include <SPI.h>
-#define use_spi
+//#define use_spi
 
 #if defined(use_spi)
 #include <SPI.h>
@@ -37,7 +37,7 @@ const uint16_t  PINK       = 0xFCFF; // M.Sandercock
 const uint16_t  PURPLE       = 0x8017; // M.Sandercock
 
 const ili_fonts_test_t font_test_list[] = {
-  {nullptr, nullptr,  "Internal Font", RED, YELLOW},
+  //{nullptr, nullptr,  "Internal Font", RED, YELLOW},  //rotations do not work with internal font
   {&Arial_14, nullptr,  "Arial_14", WHITE, WHITE},
   {&Arial_14_Bold, nullptr,  "ArialBold 14", YELLOW, YELLOW},
   {&ComicSansMS_14, nullptr,  "ComicSansMS 14", GREEN, GREEN},
@@ -81,9 +81,12 @@ void setup() {
 #else
   tft.begin(20);// 20 is working in 8bit and 16bit mode on T41
 #endif
+
+#if defined(BACKLITE)
   tft.backlight(true);
   pinMode(BACKLITE, OUTPUT);
   digitalWrite(BACKLITE, HIGH);
+#endif
 
 //  tft.setRotation(4);
   tft.fillScreen(BLACK);

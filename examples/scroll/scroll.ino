@@ -3,33 +3,27 @@
 // on the RA8876. The method used is kind of slow
 // and needs to be optimized.
 #include "Arduino.h"
-#include "RA8876_t3.h"
+
+//#define use_spi
+#if defined(use_spi)
+#include <SPI.h>
+#include <RA8876_t3.h>
+#else
+#include <RA8876_t41_p.h>
+#endif
 #include "font8x16.h"
 
-//#define RA8876_CS 10
-//#define RA8876_RESET 8
-#define BACKLITE 5 // was 7 //External backlight control connected to this Arduino pin
-//RA8876_t3 tft = RA8876_t3(RA8876_CS, RA8876_RESET); //Using standard SPI pins
-
-/*
-// MicroMod
-uint8_t dc = 13;
-uint8_t cs = 11;
-uint8_t rst = 5;
-*/
-/*
-// SDRAM DEV board V4.0
-uint8_t dc = 17;
-uint8_t cs = 14;
-uint8_t rst = 27;
-*/
-
-// T4.1
+#if defined(use_spi)
+#define RA8876_CS 10
+#define RA8876_RESET 9
+#define BACKLITE 7 //External backlight control connected to this Arduino pin
+RA8876_t3 tft = RA8876_t3(RA8876_CS, RA8876_RESET); //Using standard SPI pins
+#else
 uint8_t dc = 13;
 uint8_t cs = 11;
 uint8_t rst = 12;
-
-RA8876_t3 tft = RA8876_t3(dc,cs,rst); //(dc, cs, rst)
+RA8876_t41_p tft = RA8876_t41_p(dc,cs,rst); //(dc, cs, rst)
+#endif
 
 // Array of RA8876 Basic Colors
 PROGMEM uint16_t myColors[] = {
@@ -60,14 +54,20 @@ PROGMEM uint16_t myColors[] = {
 int i = 0, j = 0;
 int color = 1;
 void setup() {
- //I'm guessing most copies of this display are using external PWM
+  //I'm guessing most copies of this display are using external PWM
   //backlight control instead of the internal RA8876 PWM.
   //Connect a Teensy pin to pin 14 on the display.
   //Can use analogWrite() but I suggest you increase the PWM frequency first so it doesn't sing.
+#if defined(BACKLITE)
   pinMode(BACKLITE, OUTPUT);
   digitalWrite(BACKLITE, HIGH);
-
-  bool result = tft.begin(20);
+#endif
+  
+#if defined(use_spi)
+  tft.begin(); 
+#else
+  tft.begin(20);// 20 is working in 8bit and 16bit mode on T41
+#endif
 
   tft.fontLoadMEM((char *)font8x16);
   tft.fillScreen(myColors[11]);
@@ -79,23 +79,19 @@ void setup() {
 }
 
 void loop() {
-	tft.setFontSource(0);
-	tft.setFontSize(1,true);
-	tft.setCursor(0,0);
-	for(i = 32; i < 256; i++) {
-		if(color == 22) color = 1;
-		tft.setTextColor(myColors[color++] , myColors[11]);
-		tft.write(i);
-	}
-	tft.setTextColor(myColors[1] , myColors[11]);
-	while(j++ < 10) {
-		for(i = 0; i < 21; i++) {
-			tft.scrollDown();
-		}
-		for(i = 0; i < 21; i++) {
-			tft.scrollUp();
-		}
-	}
-	j = 0;
-	delay(2000);
+  tft.setFontSource(0);
+  tft.setFontSize(1,true);
+  tft.setCursor(0,0);
+  for(i = 32; i < 256; i++) {
+    if(color == 22) color = 1;
+    tft.setTextColor(myColors[color++] , myColors[11]);
+    tft.write(i);
+  }
+  tft.setTextColor(myColors[1] , myColors[11]);
+  while(j++ < 10) {
+    for(i = 0; i < 21; i++) tft.scrollDown();
+    for(i = 0; i < 21; i++) tft.scrollUp();
+  }
+  j = 0;
+  delay(2000);
 }

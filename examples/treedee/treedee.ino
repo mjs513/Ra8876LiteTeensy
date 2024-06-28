@@ -2,34 +2,27 @@
 // Taken from sumotoy's RA8875 library
 // and modified for use with the RA8876.
 #include "Arduino.h"
-#include "RA8876_t3.h"
+
+//#define use_spi
+#if defined(use_spi)
+#include <SPI.h>
+#include <RA8876_t3.h>
+#else
+#include <RA8876_t41_p.h>
+#endif
 #include <math.h>
 
-//#define RA8876_CS 10
-//#define RA8876_RESET 8
-#define BACKLITE 5 // was 7 //External backlight control connected to this Arduino pin
-//RA8876_t3 tft = RA8876_t3(RA8876_CS, RA8876_RESET); //Using standard SPI pins
-
-/*
-// MicroMod
-uint8_t dc = 13;
-uint8_t cs = 11;
-uint8_t rst = 5;
-*/
-/*
-// SDRAM DEV board V4.0
-uint8_t dc = 17;
-uint8_t cs = 14;
-uint8_t rst = 27;
-*/
-
-// T4.1
+#if defined(use_spi)
+#define RA8876_CS 10
+#define RA8876_RESET 9
+#define BACKLITE 7 //External backlight control connected to this Arduino pin
+RA8876_t3 tft = RA8876_t3(RA8876_CS, RA8876_RESET); //Using standard SPI pins
+#else
 uint8_t dc = 13;
 uint8_t cs = 11;
 uint8_t rst = 12;
-
-
-RA8876_t3 tft = RA8876_t3(dc,cs,rst); //(dc, cs, rst)
+RA8876_t41_p tft = RA8876_t41_p(dc,cs,rst); //(dc, cs, rst)
+#endif
 
 // Array of RA8876 Basic Colors
 PROGMEM uint16_t myColors[] = {
@@ -80,8 +73,7 @@ float p2x[] = {
 float p2y[] = {
   0,0,0,0,0,0,0,0};
 
-int r[] = {
-  0,0,0};
+int r[] = {0,0,0};
 
 uint8_t ch = 13; // Default line color
 uint16_t ccolor = myColors[ch];
@@ -91,19 +83,23 @@ void setup() {
   //backlight control instead of the internal RA8876 PWM.
   //Connect a Teensy pin to pin 14 on the display.
   //Can use analogWrite() but I suggest you increase the PWM frequency first so it doesn't sing.
+#if defined(BACKLITE)
   pinMode(BACKLITE, OUTPUT);
   digitalWrite(BACKLITE, HIGH);
+#endif
     
-  tft.begin(20);
-
-	tft.setCursor(0,0);
-	tft.fillScreen(myColors[11]);
-	tft.setFontSize(1,false);
-	tft.fillStatusLine(myColors[11]);
-	tft.printStatusLine(0,myColors[1],myColors[11],"Sumotoy's treedee sketch on the T4.");
-    tft.setMargins(0, 0, tft.width(), tft.height()-24); //so fillscreen doesn't erase the status bar
+#if defined(use_spi)
+  tft.begin(); 
+#else
+  tft.begin(20);// 20 is working in 8bit and 16bit mode on T41
+#endif
+  tft.setCursor(0,0);
+  tft.fillScreen(myColors[11]);
+  tft.setFontSize(1,false);
+  tft.fillStatusLine(myColors[11]);
+  tft.printStatusLine(0,myColors[1],myColors[11],"Sumotoy's treedee sketch on the T4.");
+  tft.setMargins(0, 0, tft.width(), tft.height()); //so fillscreen doesn't erase the status bar
 }
-
 
 //delay between interations 
 uint8_t speed = 20; // Change this setting to go from reasonable to rediculous .
@@ -140,16 +136,14 @@ void loop() {
   tft.drawLine(p2x[3], p2y[3], p2x[0], p2y[0], ccolor);
   tft.drawLine(p2x[7], p2y[7], p2x[4], p2y[4], ccolor);
   tft.drawLine(p2x[3], p2y[3], p2x[7], p2y[7], ccolor);
-  delay(speed); // Wanna see how fast this runs a 34MHZ? modify 'speed' above! (Or comment out)
+  delay(speed); // Wanna see how fast this runs? modify 'speed' above! (Or comment out)
 // Uncomment for random colored frames
-/*
-  if (ch >= 22) {
-    ch = 1;
-    ccolor = myColors[ch];
-    ccolor = myColors[random(1, 22)];
-  }
-  else {
-    ch++;
-  }
-*/
+//  if (ch >= 22) {
+//    ch = 1;
+//    ccolor = myColors[ch];
+//    ccolor = myColors[random(1, 22)];
+//  }
+//  else {
+//    ch++;
+//  }
 }
