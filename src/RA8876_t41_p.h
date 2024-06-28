@@ -79,7 +79,7 @@
 #define _RA8876_T41_P
 
 //#define WINT 33       // RA8876 xnWAIT pin (Dev Board)
-//#define USE_FT5206_TOUCH
+#define USE_FT5206_TOUCH
 
 #include "FlexIO_t4.h"
 

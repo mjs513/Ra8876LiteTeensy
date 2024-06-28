@@ -4957,43 +4957,30 @@ void RA8876_t41_p::writeRect(int16_t x, int16_t y, int16_t w, int16_t h, const u
 		case 0: // we will just hand off for now to 
 				// unrolled to bte call
 				//Using the BTE function is faster and will use DMA if available
-                if(BUS_WIDTH == 8) {
 			    bteMpuWriteWithROPData8(currentPage, width(), start_x, start_y,  //Source 1 is ignored for ROP 12
                               currentPage, width(), start_x, start_y, w, h,     //destination address, pagewidth, x/y, width/height
                               RA8876_BTE_ROP_CODE_12,
                               ( const unsigned char *)pcolors);
-                } else {
-			    bteMpuWriteWithROPData16(currentPage, width(), start_x, start_y,  //Source 1 is ignored for ROP 12
-                              currentPage, width(), start_x, start_y, w, h,     //destination address, pagewidth, x/y, width/height
-                              RA8876_BTE_ROP_CODE_12,
-                              ( const unsigned short *)pcolors);
-                }
 			break;
 		case 1:
 			{
 				while (h) {
 					//Serial.printf("DP %x, %d, %d %d\n", rotated_row, h, start_x, y);
-                if(BUS_WIDTH == 8) {
 				    bteMpuWriteWithROPData8(currentPage, height(), start_y, start_x,  //Source 1 is ignored for ROP 12
 	                              currentPage, height(),  start_y, start_x, 1, w,     //destination address, pagewidth, x/y, width/height
 	                              RA8876_BTE_ROP_CODE_12,
 	                              ( const unsigned char *)pcolors);
-                } else {
-				    bteMpuWriteWithROPData16(currentPage, height(), start_y, start_x,  //Source 1 is ignored for ROP 12
-	                              currentPage, height(),  start_y, start_x, 1, w,     //destination address, pagewidth, x/y, width/height
-	                              RA8876_BTE_ROP_CODE_12,
-	                              (const unsigned short *)pcolors);
-                }
 				    start_y++;
 				    h--;
 				    pcolors += w;
+
 				}
 			}
 
 			break;
 		case 2:
 			{
-				uint16_t *rotated_buffer_alloc = (uint16_t*)malloc(w * h * 2 + 32);
+				uint16_t *rotated_buffer_alloc = (uint16_t*)malloc(w * 2 + 32);
 				if (!rotated_buffer_alloc) return; // failed to allocate. 
 			    uint16_t *rotated_buffer = (uint16_t *)(((uintptr_t)rotated_buffer_alloc + 32) & ~((uintptr_t)(31)));
 				// unrolled to bte call
@@ -5002,21 +4989,18 @@ void RA8876_t41_p::writeRect(int16_t x, int16_t y, int16_t w, int16_t h, const u
 				// lets reverse data per row...
 				while (h) {
 					for (int i = 0; i < w; i++) rotated_buffer[w-i-1] = *pcolors++;
-                if(BUS_WIDTH == 8) {
 				    bteMpuWriteWithROPData8(currentPage, width(), start_x, start_y,  //Source 1 is ignored for ROP 12
                               currentPage, width(), (width()- w) - start_x , start_y, w, 1,     //destination address, pagewidth, x/y, width/height
                               RA8876_BTE_ROP_CODE_12,
                               ( const unsigned char *)rotated_buffer);
-                } else {
-				    bteMpuWriteWithROPData16(currentPage, width(), start_x, start_y,  //Source 1 is ignored for ROP 12
-                              currentPage, width(), (width()- w) - start_x, start_y, w, 1,     //destination address, pagewidth, x/y, width/height
-                              RA8876_BTE_ROP_CODE_12,
-                              ( const unsigned short *)rotated_buffer);
-                }					
 				    start_y++;
 				    h--;
 				}
+				#ifdef SPI_HAS_TRANSFER_ASYNC
+				while(activeDMA) {}; //wait forever while DMA is finishing- can't start a new transfer
+				#endif
 				free((void*)rotated_buffer_alloc);
+				endSend(true);
 			}
 			break;
 		case 3:
@@ -5024,18 +5008,10 @@ void RA8876_t41_p::writeRect(int16_t x, int16_t y, int16_t w, int16_t h, const u
 			    start_y += h;
 				while (h) {
 					//Serial.printf("DP %x, %d, %d %d\n", rotated_row, h, start_x, y);
-                if(BUS_WIDTH == 8) {
 				    bteMpuWriteWithROPData8(currentPage, height(), start_y, start_x,  //Source 1 is ignored for ROP 12
-	                              currentPage, height(), height() - start_y, start_x, 1, w,     //destination address, pagewidth, x/y, width/height
+                           currentPage, height(), height() - start_y, start_x, 1, w,     //destination address, pagewidth, x/y, width/height
 	                              RA8876_BTE_ROP_CODE_12,
 	                              ( const unsigned char *)pcolors);
-                                
-                } else {
-				    bteMpuWriteWithROPData16(currentPage, height(), start_y, start_x,  //Source 1 is ignored for ROP 12
-	                              currentPage, height(),  height() - start_y, start_x, 1, w,     //destination address, pagewidth, x/y, width/height
-	                              RA8876_BTE_ROP_CODE_12,
-	                              ( const unsigned short *)pcolors);
-			    }
 				    start_y--;
 				    h--;
 				    pcolors += w;
@@ -5348,6 +5324,7 @@ void RA8876_t41_p::writeRect8BPP(int16_t x, int16_t y, int16_t w, int16_t h,
     }
 }
 
+
 // writeRect4BPP -  write 4 bit per pixel paletted bitmap
 //          bitmap data in array at pixels, 4 bits per
 // pixel
@@ -5449,10 +5426,7 @@ void RA8876_t41_p::writeRectNBPP(int16_t x, int16_t y, int16_t w, int16_t h,
     const uint8_t *pixels_row_start = pixels; // remember our starting position offset into row
 
 
-    // Complete hack
-    // sort of complete hack:
     uint16_t buffer[w] __attribute__((aligned(32)));
-    //setAddr(x, y, x + w - 1, y + h - 1);
     for (; h > 0; h--) {
         pixels = pixels_row_start;            // setup for this row
         uint8_t pixel_shift = row_shift_init; // Setup mask
@@ -5470,8 +5444,9 @@ void RA8876_t41_p::writeRectNBPP(int16_t x, int16_t y, int16_t w, int16_t h,
         y++;
         pixels_row_start += count_of_bytes_per_row;
     }
-    endWrite16BitColors();
 }
+
+
 
 
 
