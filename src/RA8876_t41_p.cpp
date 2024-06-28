@@ -5205,7 +5205,7 @@ void RA8876_t41_p::writeRect8BPP(int16_t x, int16_t y, int16_t w, int16_t h,
 
     x += _originx;
     y += _originy;
-    int16_t w_pixels = w; // initial w passed in...
+    int16_t w_pixels __attribute__((unused)) = w; // initial w passed in...
 
     uint16_t x_clip_left =
         0; // How many entries at start of colors to skip at start of row
@@ -7338,7 +7338,7 @@ Vertical Scan direction
 PIP window will be disabled when VDIR set as 1.
 */
   unsigned char temp;
-  unsigned char temp_in;
+  unsigned char __attribute__((unused)) temp_in;
 	
 	temp_in =  temp = lcdRegDataRead(RA8876_DPCR);
 	temp |= cSetb3;
