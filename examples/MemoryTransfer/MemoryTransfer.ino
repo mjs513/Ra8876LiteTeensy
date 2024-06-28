@@ -45,51 +45,33 @@
   You can send more instructions to the LCD immediately and they will wait for the DMA to finish.
 */
 #include "Cube_172.h"
+
 #include <RA8876_t3.h>
+#else
+#include <RA8876_t41_p.h>
+#endif
 
-//#define RA8876_CS 10
-//#define RA8876_RESET 8
-#define BACKLITE 5 // was7 //My copy of the display is set for external backlight control
-//RA8876_t3 tft = RA8876_t3(RA8876_CS, RA8876_RESET); //Using standard SPI pins
-
-/*
-// MicroMod
-uint8_t dc = 13;
-uint8_t cs = 11;
-uint8_t rst = 5;
-*/
-/*
-// SDRAM DEV board V4.0
-uint8_t dc = 17;
-uint8_t cs = 14;
-uint8_t rst = 27;
-*/
-
-// T4.1
+#if defined(use_spi)
+#define RA8876_CS 10
+#define RA8876_RESET 9
+#define BACKLITE 7 //External backlight control connected to this Arduino pin
+RA8876_t3 tft = RA8876_t3(RA8876_CS, RA8876_RESET); //Using standard SPI pins
+#else
 uint8_t dc = 13;
 uint8_t cs = 11;
 uint8_t rst = 12;
-
-uint8_t busSpeed = 20;
-
-RA8876_t3 tft = RA8876_t3(dc,cs,rst); //(dc, cs, rst)
+RA8876_t41_p tft = RA8876_t41_p(dc,cs,rst); //(dc, cs, rst)
+#endif
 
 void writeImage(int x, int y, int w, int h, const unsigned char *image) {
   //copy from the PROGMEM array to the screen, at the specified x/y location
   //This code is identical to what's inside tft.putPicture()
-  
+
   //Sending bytes individually, in normal byte order
-  if(BUS_WIDTH == 8) {
-    tft.bteMpuWriteWithROPData8(tft.currentPage, tft.width(), x, y,  //Source 1 is ignored for now
-                                tft.currentPage, tft.width(), x, y, w, h,     //destination address, pagewidth, x/y, width/height
-                                RA8876_BTE_ROP_CODE_12,
-                                image);
-  } else {
-    tft.bteMpuWriteWithROPData16(tft.currentPage, tft.width(), x, y,  //Source 1 is ignored for now
-                                 tft.currentPage, tft.width(), x, y, w, h,     //destination address, pagewidth, x/y, width/height
-                                 RA8876_BTE_ROP_CODE_12,
-                                 (uint16_t *)image);
-  }	  
+  tft.bteMpuWriteWithROPData8(tft.currentPage, tft.width(), x, y,  //Source 1 is ignored for now
+                              tft.currentPage, tft.width(), x, y, w, h,     //destination address, pagewidth, x/y, width/height
+                              RA8876_BTE_ROP_CODE_12,
+                              image);
 }
 
 void writeImage16(int x, int y, int w, int h, const unsigned char *image) {
@@ -98,32 +80,19 @@ void writeImage16(int x, int y, int w, int h, const unsigned char *image) {
   //Cast the data array pointer to insist that it contains 16-bit unsigned integers
   //The only benefit of this is if you already had your data in byte-reversed 16-bit form.
   //It's actually slower than the 8 bit version.
-  if(BUS_WIDTH == 16) {
-    tft.bteMpuWriteWithROPData16(tft.currentPage, tft.width(), x, y,  //Source 1 is ignored for now
-                                 tft.currentPage, tft.width(), x, y, w, h,     //destination address, pagewidth, x/y, width/height
-                                 RA8876_BTE_ROP_CODE_12,
-                                 (uint16_t *)image);
-  } else {
-    tft.bteMpuWriteWithROPData8(tft.currentPage, tft.width(), x, y,  //Source 1 is ignored for now
-                                tft.currentPage, tft.width(), x, y, w, h,     //destination address, pagewidth, x/y, width/height
-                                RA8876_BTE_ROP_CODE_12,
-                                image);
-  }
+  tft.bteMpuWriteWithROPData16(tft.currentPage, tft.width(), x, y,  //Source 1 is ignored for now
+                               tft.currentPage, tft.width(), x, y, w, h,     //destination address, pagewidth, x/y, width/height
+                               RA8876_BTE_ROP_CODE_12,
+                               (uint16_t *)image);
 }
 
 void writeImageChromakey(int x, int y, int w, int h, ru16 chromakeyColor, const unsigned char *image) {
   //copy from the PROGMEM array to the screen, at the specified x/y location with one color transparent
-  if(BUS_WIDTH == 16) {
-    tft.bteMpuWriteWithChromaKeyData16(//no source 1 for this operation
-      tft.currentPage, tft.width(), x, y, w, h,     //destination address, x/y, width/height
-      chromakeyColor,
-      (uint16_t *)image);
-  } else {
-    tft.bteMpuWriteWithChromaKeyData8(//no source 1 for this operation
-      tft.currentPage, tft.width(), x, y, w, h,     //destination address, x/y, width/height
-      chromakeyColor,
-      image);
-  }
+
+  tft.bteMpuWriteWithChromaKeyData8(//no source 1 for this operation
+    tft.currentPage, tft.width(), x, y, w, h,     //destination address, x/y, width/height
+    chromakeyColor,
+    image);
 }
 
 void copyImageROP(int x, int y, int w, int h, uint8_t rop, const unsigned char *image) {
@@ -183,17 +152,19 @@ void writeImageChromakeyZoom(int x, int y, int w, int h, ru16 chromakeyColor, in
   }
 }
 
+
 void setup() {
   unsigned long startTime, endTime, end2Time;
-  while (!Serial && millis() < 5000) {} //wait for Serial Monitor
-
-  Serial.printf("%cLCD Memory Transfer test starting!",12);
+//  Serial.begin(9600);
+  while (!Serial && millis() < 1500) {} //wait for Serial Monitor
+  Serial.println("LCD Memory Transfer test starting!");
   Serial.print("Compiled ");
   Serial.print(__DATE__);
   Serial.print(" at ");
   Serial.println(__TIME__);
-  Serial.print("Bus transfer speed ");
-  Serial.print((float)busSpeed, 1);
+  Serial.print("SPI transfer speed ");
+//  Serial.print((float)tft.SPIspeed / 1000000, 1);
+  Serial.print((float)SPIspeed / 1000000, 1);
   Serial.print("MHz");
   Serial.println("\n");
 
@@ -206,7 +177,12 @@ void setup() {
   digitalWrite(BACKLITE, HIGH);
 //  analogWrite(BACKLITE, 256);
 
-  bool result = tft.begin(busSpeed);
+#if defined(use_spi)
+  tft.begin(); 
+  boolean result = 1;
+#else
+  boolean result = tft.begin(20);// 20 is working in 8bit and 16bit mode on T41
+#endif
 
   if (!result) {
     Serial.println("TFT initialization failed!");
@@ -227,6 +203,7 @@ void setup() {
   tft.setTextColor(WHITE, DARKBLUE);
   tft.print("Background");
 
+
   //This example sends the image three times, so you can see the
   //different trade-offs using either put-picture, 8-bit or 16-bit transfers...
 
@@ -243,26 +220,30 @@ void setup() {
   Serial.print((float)(end2Time - endTime) / 1000.0, 3);
   Serial.println("ms because data transfer was still underway");
 
-  if(BUS_WIDTH == 16) {
-    startTime = millis();
-    writeImage16(20, 5, IMG_WIDTH, IMG_HEIGHT, image_565);  //basic send, using 16-bit byte-swapped data
-    endTime = millis();
-    Serial.print("16-bit copy from PROGMEM to display took ");
-    Serial.print((float)(end2Time - startTime) / 1000.0, 3);
-    Serial.println("ms to begin the transfer (data is on its way while you read this.)");
-  } else {
-    startTime = millis();
-    writeImage(20, 5, IMG_WIDTH, IMG_HEIGHT, image_565);  //Duplicate of basic send
-    endTime = millis();
-    Serial.print("8-bit Copy from PROGMEM to display took ");
-    Serial.print((float)(endTime - startTime) / 1000.0, 3);
-    Serial.println("ms to begin the transfer (data is on its way while you read this.)");
-  }
+  startTime = micros();
+  writeImage(20, 5, IMG_WIDTH, IMG_HEIGHT, image_565);  //Duplicate of basic send
+  endTime = micros();
+  Serial.print("Copy from PROGMEM to display took ");
+  Serial.print((float)(endTime - startTime) / 1000.0, 3);
+  Serial.println("ms to begin the transfer (data is on its way while you read this.)");
+
+  tft.check2dBusy();
+  startTime = micros();
+  writeImage16(20, 5, IMG_WIDTH, IMG_HEIGHT, image_565_swap);  //basic send, using 16-bit byte-swapped data
+  endTime = micros();
+  tft.check2dBusy();
+  end2Time = micros();
+  Serial.print("16-bit copy from PROGMEM to display took ");
+  Serial.print((float)(end2Time - startTime) / 1000.0, 3);
+  Serial.println("ms");
+
 
   //Chromakey can also be done as 16-bit or 8-bit but the time taken is identical to the normal write
   //It's actually the same operation underneath, just with the background color set to the chromakey
+
   startTime = micros();
   writeImageChromakey(20 + 1 * (IMG_WIDTH + 20), 5, IMG_WIDTH, IMG_HEIGHT, 0xffdf, image_565);
+  tft.check2dBusy(); //wait for transfer to complete and then for RA8876 to report that it's ready for the next command (DON'T need to do this for normal programs)
   end2Time = micros();
   tft.setCursor(20 + 1 * (IMG_WIDTH + 20), 5 + IMG_HEIGHT);
   tft.setTextColor(WHITE, DARKBLUE);
@@ -270,6 +251,8 @@ void setup() {
   Serial.print("Chromakey copy from PROGMEM to display took ");
   Serial.print((float)(end2Time - startTime) / 1000.0, 3);
   Serial.println("ms to run to completion.");
+
+
 
   //Now run through all the ROP options to see what they look like...
 
@@ -280,7 +263,6 @@ void setup() {
     startTime = micros();
     copyImageROP(20 + i * (IMG_WIDTH + 20), 5 + j * (24 + IMG_HEIGHT), IMG_WIDTH, IMG_HEIGHT, rop, image_565);
     endTime = micros();
-
     //at this point, we can keep working but the BTE operation is ongoing, inside the RAiO chip
     tft.check2dBusy(); //wait until chip is not busy
     unsigned long end2 = micros();
@@ -293,12 +275,10 @@ void setup() {
     Serial.print("ROP ");
     Serial.print(rop);
     Serial.print("  BTE copy took ");
-    Serial.print((float)(endTime - startTime), 3);
-//    Serial.print((float)(endTime - startTime) / 1000.0, 3);
-    Serial.print("us, followed by ");
-    Serial.print((float)(end2 - endTime), 3);
-//    Serial.print((float)(end2 - endTime) / 1000.0, 3);
-    Serial.println("us internal processing in the RAiO chip.");
+    Serial.print((float)(endTime - startTime) / 1000.0, 3);
+    Serial.print("ms, followed by ");
+    Serial.print((float)(end2 - endTime) / 1000.0, 3);
+    Serial.println("ms internal processing in the RAiO chip.");
 
     //Some of the ROP operations are not necessary to display
     //  so we will "skip" them by not moving the graphics pointer forwards to the next square
@@ -331,6 +311,9 @@ void setup() {
   //If you need to examine your chromakey zoomed-in, looking for errant pixels, try this...
   //writeImageChromakeyZoom(20 + 2*(IMG_WIDTH + 20), 5, IMG_WIDTH, IMG_HEIGHT, 0xffdf, 3, image_565);
 
+
+
+
   Serial.println("\n\nFirst Page Finished, PRESS ANY KEY...");
   while (Serial.available() > 0) {
     Serial.read(); //clear input buffer
@@ -347,7 +330,8 @@ void setup() {
   tft.fillScreen(DARKGREEN);
   tft.setCursor(400, 180);
   tft.setTextColor(WHITE, DARKGREEN);
-  tft.printf(" Test Alpha...");
+  tft.print("Test Alpha...");
+
 }
 
 void loop() {
@@ -366,7 +350,7 @@ void loop() {
                                tft.currentPage, tft.width(), 400, 200, IMG_WIDTH, IMG_HEIGHT,     //destination address, x/y, width/height
                                alpha);
 
-  delay(100);
+  delay(120);
 
   if (alpha >= 32) {
     increment = -1;
@@ -376,11 +360,4 @@ void loop() {
     increment = 1;
     delay(800);
   }
-}
-
-void waitforInput()
-{
-  Serial.println("Press anykey to continue");
-  while (Serial.read() == -1) ;
-  while (Serial.read() != -1) ;
 }
