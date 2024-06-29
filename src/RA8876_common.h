@@ -613,8 +613,8 @@ class RA8876_common : public Print {
         _invisible = (_displayclipx1 == _displayclipx2 || _displayclipy1 == _displayclipy2);
         _standard = (_displayclipx1 == 0) && (_displayclipx2 == _width) && (_displayclipy1 == 0) && (_displayclipy2 == _height);
         if (Serial) {
-            // Serial.printf("UDC (%d %d)-(%d %d) %d %d\n", _displayclipx1, _displayclipy1, _displayclipx2,
-            //	_displayclipy2, _invisible, _standard);
+            Serial.printf("UDC (%d %d)-(%d %d) %d %d\n", _displayclipx1, _displayclipy1, _displayclipx2,
+                          _displayclipy2, _invisible, _standard);
         }
     }
 
@@ -928,6 +928,7 @@ class RA8876_common : public Print {
 #ifdef Adafruit_GFX_Button
 #undef Adafruit_GFX_Button
 #endif
+
 #define Adafruit_GFX_Button RA8876_Button
 class RA8876_Button {
   public:

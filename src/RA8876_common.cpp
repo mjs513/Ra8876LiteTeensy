@@ -3351,6 +3351,24 @@ void RA8876_common::drawCircle(ru16 x0, ru16 y0, ru16 r, ru16 color) {
     x0 += _originx;
     y0 += _originy;
 
+    // Rectangular clipping
+    int16_t dia = 2 * r;
+    int16_t x_start = x0 - r - 1;
+    int16_t y_start = y0 - r - 1;
+    int16_t x_end = x_start + dia - 1;
+    int16_t y_end = y_start + dia - 1;
+    Serial.printf("DrawCircle Center/Radius: %d, %d, %d\n", x0, y0, r);
+    Serial.printf("Xstart: %d, Ystart: %d, Xend: %d, Yend: %d\n", x_start, y_start, x_end, y_end);
+    // Rectangular clipping
+    if ((x_start >= _displayclipx2) || // Clip right
+        (y_start >= _displayclipy2) || // Clip bottom
+        (x_end < _displayclipx1) ||    // Clip left
+        (y_end < _displayclipy1))      // Clip top
+    {
+        // outside the clip rectangle
+        return;
+    }
+
     if (r < 1)
         r = 1;
     if (r < 2) { // NEW
@@ -3395,6 +3413,24 @@ void RA8876_common::drawCircle(ru16 x0, ru16 y0, ru16 r, ru16 color) {
 void RA8876_common::drawCircleFill(ru16 x0, ru16 y0, ru16 r, ru16 color) {
     x0 += _originx;
     y0 += _originy;
+
+    // Rectangular clipping
+    int16_t dia = 2 * r;
+    int16_t x_start = x0 - r - 1;
+    int16_t y_start = y0 - r - 1;
+    int16_t x_end = x_start + dia - 1;
+    int16_t y_end = y_start + dia - 1;
+    Serial.printf("Circle Center/Radius: %d, %d, %d\n", x0, y0, r);
+    Serial.printf("Xstart: %d, Ystart: %d, Xend: %d, Yend: %d\n", x_start, y_start, x_end, y_end);
+    // Rectangular clipping
+    if ((x_start >= _displayclipx2) || // Clip right
+        (y_start >= _displayclipy2) || // Clip bottom
+        (x_end < _displayclipx1) ||    // Clip left
+        (y_end < _displayclipy1))      // Clip top
+    {
+        // outside the clip rectangle
+        return;
+    }
 
     if (r < 1)
         r = 1;
@@ -5026,8 +5062,19 @@ void RA8876_common::fillRectHGradient(int16_t x, int16_t y, int16_t w, int16_t h
     y += _originy;
 
     // Rectangular clipping
-    if ((x >= _displayclipx2) || (y >= _displayclipy2))
+    int16_t x_end = x + w - 1;
+    int16_t y_end = y + h - 1;
+    // Rectangular clipping
+    if ((x >= _displayclipx2) ||    // Clip right
+        (y >= _displayclipy2) ||    // Clip bottom
+        (x_end < _displayclipx1) || // Clip left
+        (y_end < _displayclipy1))   // Clip top
+    {
+        // outside the clip rectangle
         return;
+    }
+    // if ((x >= _displayclipx2) || (y >= _displayclipy2))
+    //     return;
     if (x < _displayclipx1) {
         w -= (_displayclipx1 - x);
         x = _displayclipx1;
@@ -5074,10 +5121,20 @@ void RA8876_common::fillRectVGradient(int16_t x, int16_t y, int16_t w, int16_t h
                                       uint16_t color1, uint16_t color2) {
     x += _originx;
     y += _originy;
-
+    int16_t x_end = x + w - 1;
+    int16_t y_end = y + h - 1;
     // Rectangular clipping
-    if ((x >= _displayclipx2) || (y >= _displayclipy2))
+    if ((x >= _displayclipx2) ||    // Clip right
+        (y >= _displayclipy2) ||    // Clip bottom
+        (x_end < _displayclipx1) || // Clip left
+        (y_end < _displayclipy1))   // Clip top
+    {
+        // outside the clip rectangle
         return;
+    }
+
+    // if ((x >= _displayclipx2) || (y >= _displayclipy2))
+    //     return;
     if (x < _displayclipx1) {
         w -= (_displayclipx1 - x);
         x = _displayclipx1;
