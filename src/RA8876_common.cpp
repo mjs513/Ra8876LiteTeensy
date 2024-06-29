@@ -3354,9 +3354,9 @@ void RA8876_common::drawCircle(ru16 x0, ru16 y0, ru16 r, ru16 color) {
     // Rectangular clipping
     int16_t dia = 2 * r;
     int16_t x_start = x0 - r - 1;
-    int16_t y_start = y0 - r - 1;
+    int16_t y_start = y0 + r - 1;
     int16_t x_end = x_start + dia - 1;
-    int16_t y_end = y_start + dia - 1;
+    int16_t y_end = y_start - dia - 1;
     Serial.printf("DrawCircle Center/Radius: %d, %d, %d\n", x0, y0, r);
     Serial.printf("Xstart: %d, Ystart: %d, Xend: %d, Yend: %d\n", x_start, y_start, x_end, y_end);
     // Rectangular clipping
@@ -3417,10 +3417,10 @@ void RA8876_common::drawCircleFill(ru16 x0, ru16 y0, ru16 r, ru16 color) {
     // Rectangular clipping
     int16_t dia = 2 * r;
     int16_t x_start = x0 - r - 1;
-    int16_t y_start = y0 - r - 1;
+    int16_t y_start = y0 + r - 1;
     int16_t x_end = x_start + dia - 1;
-    int16_t y_end = y_start + dia - 1;
-    Serial.printf("Circle Center/Radius: %d, %d, %d\n", x0, y0, r);
+    int16_t y_end = y_start - dia - 1;
+    Serial.printf("DrawCircle Center/Radius: %d, %d, %d\n", x0, y0, r);
     Serial.printf("Xstart: %d, Ystart: %d, Xend: %d, Yend: %d\n", x_start, y_start, x_end, y_end);
     // Rectangular clipping
     if ((x_start >= _displayclipx2) || // Clip right
