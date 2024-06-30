@@ -2622,6 +2622,7 @@ void RA8876_common::Memory_XY_Mode(void) {
 
     temp = lcdRegDataRead(RA8876_AW_COLOR);
     temp &= cClrb2;
+    // lcdRegWrite(RA8876_AW_COLOR);
     lcdRegDataWrite(RA8876_AW_COLOR, temp);
 }
 
@@ -2945,6 +2946,12 @@ void RA8876_common::drawLine(ru16 x0, ru16 y0, ru16 x1, ru16 y1, ru16 color) {
     y0 += _originy;
     y1 += _originy;
 
+    // Rectangular clipping
+    if ((x0 < _displayclipx1) || (x0 >= _displayclipx2) || (y0 >= _displayclipy2))
+        return;
+    if ((y0 < _displayclipy1) || (y0 >= _displayclipy2))
+        return;
+
     if ((x0 == x1 && y0 == y1)) { // Thanks MrTOM
         drawPixel(x0, y0, color);
         return;
@@ -3237,6 +3244,23 @@ void RA8876_common::drawTriangle(ru16 x0, ru16 y0, ru16 x1, ru16 y1, ru16 x2, ru
     y1 += _originy;
     y2 += _originy;
 
+    // Rectangular clipping
+
+    if (x0 <= _displayclipx1 || x1 <= _displayclipx1 || x2 <= _displayclipx1 || x0 >= _displayclipx2 || x1 >= _displayclipx2 || x2 >= _displayclipx2) {
+        return;
+    }
+    if (y0 >= _height || y1 >= _height || y2 >= _height)
+        return;
+
+    if (x0 >= _width || x1 >= _width || x2 >= _width)
+        return;
+    if (y0 >= _height || y1 >= _height || y2 >= _height)
+        return;
+    if (x0 == x1 && y0 == y1 && x0 == x2 && y0 == y2) { // All points are same
+        drawPixel(x0, y0, color);
+        return;
+    }
+
     if (x0 >= _width || x1 >= _width || x2 >= _width)
         return;
     if (y0 >= _height || y1 >= _height || y2 >= _height)
@@ -3296,6 +3320,11 @@ void RA8876_common::drawTriangleFill(ru16 x0, ru16 y0, ru16 x1, ru16 y1, ru16 x2
     y1 += _originy;
     y2 += _originy;
 
+    if (x0 <= _displayclipx1 || x1 <= _displayclipx1 || x2 <= _displayclipx1 || x0 >= _displayclipx2 || x1 >= _displayclipx2 || x2 >= _displayclipx2) {
+        return;
+    }
+    if (y0 >= _height || y1 >= _height || y2 >= _height)
+        return;
     if (x0 >= _width || x1 >= _width || x2 >= _width)
         return;
     if (y0 >= _height || y1 >= _height || y2 >= _height)
@@ -3357,9 +3386,9 @@ void RA8876_common::drawCircle(ru16 x0, ru16 y0, ru16 r, ru16 color) {
     int16_t y_start = y0 + r - 1;
     int16_t x_end = x_start + dia - 1;
     int16_t y_end = y_start - dia - 1;
-    Serial.printf("DrawCircle Center/Radius: %d, %d, %d\n", x0, y0, r);
-    Serial.printf("Xstart: %d, Ystart: %d, Xend: %d, Yend: %d\n", x_start, y_start, x_end, y_end);
-    // Rectangular clipping
+    // Serial.printf("DrawCircle Center/Radius: %d, %d, %d\n", x0, y0, r);
+    // Serial.printf("Xstart: %d, Ystart: %d, Xend: %d, Yend: %d\n", x_start, y_start, x_end, y_end);
+    //  Rectangular clipping
     if ((x_start >= _displayclipx2) || // Clip right
         (y_start >= _displayclipy2) || // Clip bottom
         (x_end < _displayclipx1) ||    // Clip left
@@ -3420,9 +3449,9 @@ void RA8876_common::drawCircleFill(ru16 x0, ru16 y0, ru16 r, ru16 color) {
     int16_t y_start = y0 + r - 1;
     int16_t x_end = x_start + dia - 1;
     int16_t y_end = y_start - dia - 1;
-    Serial.printf("DrawCircle Center/Radius: %d, %d, %d\n", x0, y0, r);
-    Serial.printf("Xstart: %d, Ystart: %d, Xend: %d, Yend: %d\n", x_start, y_start, x_end, y_end);
-    // Rectangular clipping
+    // Serial.printf("DrawCircle Center/Radius: %d, %d, %d\n", x0, y0, r);
+    // Serial.printf("Xstart: %d, Ystart: %d, Xend: %d, Yend: %d\n", x_start, y_start, x_end, y_end);
+    //  Rectangular clipping
     if ((x_start >= _displayclipx2) || // Clip right
         (y_start >= _displayclipy2) || // Clip bottom
         (x_end < _displayclipx1) ||    // Clip left
@@ -7815,4 +7844,72 @@ uint8_t RA8876_common::getGesture(void) {
     }
     return _gesture;
 }
+/*
+bool RA8876_common::setCanvasRegion(uint32_t address, uint16_t width) {
+    if (address & 0x3)
+        return false; // Address must me multiple of 4
+    else if ((width & 0x03) || (width > 0x1FFF))
+        return false; // Width must be multiple of 4 and fit in 13 bits
+
+    // Set canvas start address
+    // writeReg32(RA8876_REG_CVSSA0, address);
+    canvasImageStartAddress(address);
+    // uint8_t aw_color = readReg(RA8876_REG_AW_COLOR);
+    uint8_t aw_color = lcdRegDataRead(RA8876_AW_COLOR);
+
+    if (width) {
+        aw_color &= 0xFB; // Block mode
+        // writeReg16(RA8876_REG_CVS_IMWTH0, width);
+        canvasImageWidth(width);
+    } else {
+        aw_color |= 0x04; // Linear mode
+    }
+
+    // writeReg(RA8876_REG_AW_COLOR, aw_color);
+    lcdRegDataWrite(RA8876_AW_COLOR, aw_color);
+
+    return true;
+}
+
+bool RA8876_common::setCanvasWindow(uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
+    if (x + width > 8188)
+        return false;
+    else if (y + height > 8191)
+        return false;
+
+    // Set active window offset
+    activeWindowXY(x, y);
+
+    // Set active window dimensions
+    activeWindowWH(width, height);
+
+    return true;
+}
+
+bool RA8876_common::setDisplayRegion(uint32_t address, uint16_t width) {
+    if (address & 0x3)
+        return false; // Address must me multiple of 4
+    else if ((width & 0x03) || (width > 8188))
+        return false; // Width must be multiple of 4 and max 8188
+
+    // Set main window start address
+    displayImageStartAddress(address);
+
+    // Set main window image width
+    displayImageWidth(width);
+    return true;
+}
+
+bool RA8876_common::setDisplayOffset(uint16_t x, uint16_t y) {
+    if (x > 8188)
+        return false;
+    else if (y > 8191)
+        return false;
+
+    // Set main window offset
+    displayWindowStartXY(x, y);
+
+    return true;
+}
+*/
 #endif
